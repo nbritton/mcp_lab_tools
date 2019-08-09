@@ -21,3 +21,11 @@ zfs set mountpoint=/var/lib/libvirt/images data/images;
 zfs create data/images/lab01;
 zfs snapshot data/images/lab01@my-snapshot-name;
 zfs rollback data/images/lab01@my-snapshot-name;
+
+You can also setup the virtual networks across machines, this is useful if you don't have enough resources on a single lab hypervisor instance to run the whole MCP HA stack. For instance if you have three machines with 128GB of memory on them each then this should be enough to memory to scale a production scale MCP cluster across them:
+
+lab hypervisor 1: kvm1, osd1/2, gtw1, and cmp1. 
+lab hypervisor 2: kvm2, osd3/4, gtw2, and cmp2. 
+lab hypervisor 3: kvm3, osd5/6, gtw3, and cmp3.
+
+The virtual dummy networks on the three lab hypervisors are all on separate layer 2 domains, which is to say that they're not connected at all except for layer 3 access through the vrouter gateway. The way you can connect the virtual dummy networks together on the three lab hypervisors into a single logical domain is to create a layer 2 mesh overlay network on the lab hypervisors. This can be done using Open vSwitch with Stateless Transport Tunneling ("STT"), I maintain a DPDK enabled OVS package repository for Ubuntu 18.04 here: http://www.exabit.io/ubuntu
