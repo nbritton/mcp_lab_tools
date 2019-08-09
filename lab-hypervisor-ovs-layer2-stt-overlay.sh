@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# This script illustrates and example of a lab hypervisor configured with a layer 2 mesh overlay
-# network for establishing a virtual network that spans across multiple lab hypervisors.
+# This script illustrates an example of a lab hypervisor configured with a layer 2 mesh overlay
+# network for establishing a virtual layer 2 network that spans across multiple lab hypervisors.
 # Ubuntu Server 18.04.2 + OVS 2.11 + DPDK 18.11
 
 apt update;
