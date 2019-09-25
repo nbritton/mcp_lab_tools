@@ -1,3 +1,11 @@
+### Netplan Configuration for Ubuntu Server 18.04 Lab Server ###
+
+### Setup Persistant Network Dummy Interfaces. ###
+# for i in $(seq 8); do
+#     printf "[NetDev]\nName=dummy${i}\nKind=dummy\n" > /etc/systemd/network/dummy${i}.netdev;
+# done
+# systemctl restart systemd-networkd.service;
+
 network:
   version: 2
   renderer: networkd
