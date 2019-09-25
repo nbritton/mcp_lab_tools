@@ -1,0 +1,140 @@
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    eno1: {}
+    eno2: {}
+    eno3: {}
+    eno4: {}
+    dummy1: {}
+    dummy2: {}
+    dummy3: {}
+    dummy4: {}
+    dummy5: {}
+    dummy6: {}
+    dummy7: {}
+    dummy8: {}
+
+  bonds:
+    bond1:
+      interfaces: [eno1, eno2, eno3, eno4]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+    bond2: # This is mainly for illustrative purposes
+      interfaces: [dummy1, dummy2]
+      parameters:
+        mode: balance-tlb
+        transmit-hash-policy: layer3+4
+
+  bridges:
+    internet:
+      interfaces: [bond1]
+      dhcp4: yes
+      dhcp6: yes
+      nameservers:
+        addresses: [1.1.1.1, "2606:4700:4700::1111", 1.0.0.1, "2606:4700:4700::1001"]
+
+    intranet:
+      interfaces: [bond2]
+      addresses: [10.10.10.10/16]
+      routes:
+        - to: 10.10.0.0/16
+          via: 10.10.0.1
+          scope: link
+          table: 100
+
+  vlans:
+    intranet10:
+      id: 10
+      link: intranet
+      addresses: [10.20.10.10/24]
+      routes:
+        - to: 10.20.10.0/24
+          via: 10.20.10.1
+          scope: link
+          table: 10
+
+    intranet20:
+      id: 20
+      link: intranet
+      addresses: [10.20.20.10/24]
+      routes:
+        - to: 10.20.20.0/24
+          via: 10.20.20.1
+          scope: link
+          table: 20
+
+    intranet30:
+      id: 30
+      link: intranet
+      addresses: [10.20.30.10/24]
+      routes:
+        - to: 10.20.30.0/24
+          via: 10.20.30.1
+          scope: link
+          table: 30
+
+    intranet40:
+      id: 40
+      link: intranet
+      addresses: [10.20.40.10/24]
+      routes:
+        - to: 10.20.40.0/24
+          via: 10.20.40.1
+          scope: link
+          table: 40
+
+    intranet50:
+      id: 50
+      link: intranet
+      addresses: [10.20.50.10/24]
+      routes:
+        - to: 10.20.50.0/24
+          via: 10.20.50.1
+          scope: link
+          table: 50
+
+    intranet60:
+      id: 60
+      link: intranet
+      addresses: [10.20.60.10/24]
+      routes:
+        - to: 10.20.60.0/24
+          via: 10.20.60.1
+          scope: link
+          table: 60
+
+    intranet70:
+      id: 70
+      link: intranet
+      addresses: [10.20.70.10/24]
+      routes:
+        - to: 10.20.70.0/24
+          via: 10.20.70.1
+          scope: link
+          table: 70
+
+    intranet80:
+      id: 80
+      link: intranet
+      addresses: [10.20.80.10/24]
+      routes:
+        - to: 10.20.80.0/24
+          via: 10.20.80.1
+          scope: link
+          table: 80
+
+    intranet90:
+      id: 90
+      link: intranet
+      addresses: [10.20.90.10/24]
+      routes:
+        - to: 10.20.90.0/24
+          via: 10.20.90.1
+          scope: link
+          table: 90
