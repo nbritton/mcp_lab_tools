@@ -86,3 +86,60 @@ gpg -a --export 1285491434D8786F | sudo apt-key add -;
 apt -y install srvadmin-all;
 exit && sudo -i;
 apt -y install --reinstall srvadmin-all;
+
+### Force enable x2APIC mode:
+sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="intremap=no_x2apic_optout /' /etc/default/grub;
+update-grub;
+
+### Setup Network Dummy Interface ###
+printf "[NetDev]\nName=dummy1\nKind=dummy\n" > /etc/systemd/network/dummy1.netdev;
+systemctl restart systemd-networkd.service;
+
+### Netplan configuration ###
+mv /etc/netplan/01-network-manager-all.yaml /root/;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    eno1: {}
+    eno2: {}
+    eno3: {}
+    eno4: {}
+    enp66s0: {}
+    enp66s0d1: {}
+    dummy1: {}
+
+  bonds:
+    bond0: # Mellanox ConnectX-3 MCX354A-FCBT
+      interfaces: [enp66s0, enp66s0d1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+    bond1: # QLogic 57840S, Dell P/N: XGRFF
+      interfaces: [eno1, eno2, eno3, eno4]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+      dhcp4: yes
+      dhcp4-overrides:
+       use-routes: false
+
+  bridges:
+    internet:
+      interfaces: [bond0]
+      dhcp4: yes
+      nameservers:
+        addresses: [1.1.1.1, 1.0.0.1]
+
+    intranet:
+      interfaces: [dummy1]
+      addresses: [10.10.10.10/16]
+EOF
+netplan apply;
