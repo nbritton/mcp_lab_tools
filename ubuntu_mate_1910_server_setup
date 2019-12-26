@@ -77,7 +77,7 @@ apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
 
 ### Install various utilities and essential packages:
-apt -y install bc build-essential chromium-browser fio htop httpie iftop iotop iozone3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover ngrep nmap pcregrep smartmontools socat speedtest-cli sysstat vim zfsutils-linux;
+apt -y install bc build-essential chromium-browser fio htop httpie iftop iotop iozone3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep smartmontools socat speedtest-cli sysstat vim zfsutils-linux;
 
 ### Install Dell OpenManage:
 echo 'deb http://linux.dell.com/repo/community/openmanage/932/bionic bionic main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
