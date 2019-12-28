@@ -49,7 +49,7 @@ apt -y install tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-d
 
 ## Configure Mellanox Card (enable SR-IOV with 16 vf and set port mode to Ethernet only):
 mst start;
-mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=16 LINK_TYPE_P1=2 LINK_TYPE_P2=2;
+mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=16 LINK_TYPE_P1=2 LINK_TYPE_P2=3;
 
 ### Nvidia GPU Compute Drivers:
 apt install nvidia-headless-435 nvidia-utils-435;
