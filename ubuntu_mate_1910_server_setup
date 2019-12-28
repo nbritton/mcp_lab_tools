@@ -22,7 +22,7 @@
 apt update && apt -y upgrade;
 
 ## Install common packages.
-apt -y install openssl-server ubuntu-server xrdp dkms;
+apt -y install openssh-server ubuntu-server xrdp dkms;
 
 ## Disable splash screen, quiet boot, CPU mitigations (i.g. meltdown, spectre), and IPv6.
 sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT="ipv6.disable=1 mitigations=off"/' /etc/default/grub;
