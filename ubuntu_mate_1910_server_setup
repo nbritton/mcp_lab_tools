@@ -8,13 +8,9 @@
 
 ### Installation steps for EFI enabled systems:
 1, Open MATE Terminal: Click on Menu >> System Tools >> MATE Terminal
-2, Run: sudo -i;
-3a, Run: apt update;
-3b, Run: apt -y upgrade; # It may be possible to omit this step.
-4, Run: apt -y install grub-efi;
-5, Open Installer: Click on Menu >> Administration >> Install Ubuntu MATE 19.10
-6, Click through the installer menus as you normally would.
-7, For installation type select: "EXPERIMENTAL: Erase disk and use ZFS".
+2, Run: sudo apt -y install grub-efi;
+3, Open Installer: Click on Menu >> Administration >> Install Ubuntu MATE 19.10
+4, Click through the installer menus as you normally would.
 
 ### Post Install Common Steps:
 
@@ -22,11 +18,25 @@
 apt update && apt -y upgrade;
 
 ## Setup openssh-server
-apt -y install openssh-server;
+apt -y install openssh-server ubuntu-server xrdp dkms;
 systemctl enable ssh;
 
-## Install common packages.
-apt -y install ubuntu-server xrdp dkms;
+### Enable password-less sudo for users in the sudo group:
+sed -i 's/^%sudo.*ALL$/%sudo\tALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers;
+
+### Setup SSH public key for password-less login:
+install -d -o nbritton -g nbritton -m 700 /home/nbritton/.ssh;
+curl -s https://launchpad.net/%7Enbritton/+sshkeys > /home/nbritton/.ssh/id_rsa.pub;
+chown nbritton:nbritton /home/nbritton/.ssh/id_rsa.pub;
+install -o nbritton -g nbritton -m 600 /home/nbritton/.ssh/id_rsa.pub /home/nbritton/.ssh/authorized_keys;
+
+### Setup SSH client:
+sed -i 's/^#   StrictHostKeyChecking ask/    StrictHostKeyChecking accept-new/' /etc/ssh/ssh_config;
+sed -i 's/^#   Ciphers .*/    Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com/' /etc/ssh/ssh_config;
+
+### Disable password based remote SSH login:
+sed -i 's/^#PasswordAuthentication yes$/PasswordAuthentication no/' /etc/ssh/sshd_config;
+sed -i 's/^UsePAM yes$/#UsePAM yes/' /etc/ssh/sshd_config;
 
 ## Disable splash screen, quiet boot, CPU mitigations (i.g. meltdown, spectre), and IPv6.
 sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT="ipv6.disable=1 mitigations=off"/' /etc/default/grub;
@@ -59,26 +69,9 @@ mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=16 LINK_TYPE_P1=
 apt install nvidia-headless-435 nvidia-utils-435;
 echo "blacklist nouveau" > /etc/modprobe.d/blacklist-nouveau.conf;
 
-### Enable password-less sudo for users in the sudo group:
-sed -i 's/^%sudo.*ALL$/%sudo\tALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers;
-
-### Setup SSH public key for password-less login:
-install -d -o nbritton -g nbritton -m 700 /home/nbritton/.ssh;
-curl -s https://launchpad.net/%7Enbritton/+sshkeys > /home/nbritton/.ssh/id_rsa.pub;
-chown nbritton:nbritton /home/nbritton/.ssh/id_rsa.pub;
-install -o nbritton -g nbritton -m 600 /home/nbritton/.ssh/id_rsa.pub /home/nbritton/.ssh/authorized_keys;
-
-### Setup SSH client:
-sed -i 's/^#   StrictHostKeyChecking ask/    StrictHostKeyChecking accept-new/' /etc/ssh/ssh_config;
-sed -i 's/^#   Ciphers .*/    Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com/' /etc/ssh/ssh_config;
-
-### Disable password based remote SSH login:
-sed -i 's/^#PasswordAuthentication yes$/PasswordAuthentication no/' /etc/ssh/sshd_config;
-sed -i 's/^UsePAM yes$/#UsePAM yes/' /etc/ssh/sshd_config;
-
 ### Enable KVM virtualization:
-apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager;
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
+apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager;
 
 ### Install various utilities and essential packages:
 apt -y install bc build-essential chromium-browser cpufrequtils fio htop httpie iftop iotop iozone3 iperf3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep smartmontools socat speedtest-cli stress-ng sysstat vim zfsutils-linux;
@@ -108,43 +101,25 @@ network:
   renderer: networkd
 
   ethernets:
-    eno1: {}
-    eno2: {}
-    eno3: {}
-    eno4: {}
-    enp66s0: {}
-    enp66s0d1: {}
-    dummy1: {}
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    eno3: {mtu: 9000}
+    eno4: {mtu: 9000}
+    enp65s0: {mtu: 9000}
+    ibp65s0d1: {}
 
   bonds:
-    bond0: # Mellanox ConnectX-3 MCX354A-FCBT
-      interfaces: [enp66s0, enp66s0d1]
+    bond0:
+      mtu: 9000
+      interfaces: [enp65s0, eno1]
       parameters:
-        mode: 802.3ad
-        lacp-rate: fast
+        primary: enp65s0
+        mode: balance-alb
         mii-monitor-interval: 100
         transmit-hash-policy: layer3+4
-
-    bond1: # QLogic 57840S, Dell P/N: XGRFF
-      interfaces: [eno1, eno2, eno3, eno4]
-      parameters:
-        mode: 802.3ad
-        lacp-rate: fast
-        mii-monitor-interval: 100
-        transmit-hash-policy: layer3+4
-      dhcp4: yes
-      dhcp4-overrides:
-       use-routes: false
-
-  bridges:
-    internet:
-      interfaces: [bond0]
+        primary-reselect-policy: better
       dhcp4: yes
       nameservers:
-        addresses: [1.1.1.1, 1.0.0.1]
-
-    intranet:
-      interfaces: [dummy1]
-      addresses: [10.10.10.10/16]
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
 EOF
 netplan apply;
