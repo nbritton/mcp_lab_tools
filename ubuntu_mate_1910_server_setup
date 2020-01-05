@@ -109,7 +109,8 @@ network:
     eno3: {mtu: 9000}
     eno4: {mtu: 9000}
     enp66s0: {mtu: 9000}
-    ibp66s0d1: {}
+    ibp66s0d1:
+      addresses: [192.168.144.10/24]
 
   bonds:
     bond0:
