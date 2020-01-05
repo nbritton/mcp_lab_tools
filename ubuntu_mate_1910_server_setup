@@ -88,6 +88,10 @@ apt -y install --reinstall srvadmin-all;
 sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="intremap=no_x2apic_optout /' /etc/default/grub;
 update-grub;
 
+### Disable UFW - Firewall ###
+systemctl disable ufw;
+systemctl stop ufw;
+
 ### Setup Network Dummy Interface ###
 printf "[NetDev]\nName=dummy1\nKind=dummy\n" > /etc/systemd/network/dummy1.netdev;
 systemctl restart systemd-networkd.service;
