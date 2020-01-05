@@ -104,19 +104,23 @@ network:
     eno2: {mtu: 9000}
     eno3: {mtu: 9000}
     eno4: {mtu: 9000}
-    enp65s0: {mtu: 9000}
-    ibp65s0d1: {}
+    enp66s0: {mtu: 9000}
+    ibp66s0d1: {}
 
   bonds:
     bond0:
       mtu: 9000
-      interfaces: [enp65s0, eno1]
+      interfaces: [enp66s0, eno1]
       parameters:
-        primary: enp65s0
+        primary: enp66s0
         mode: balance-alb
         mii-monitor-interval: 100
         transmit-hash-policy: layer3+4
         primary-reselect-policy: better
+
+  bridges:
+    internet:
+      interfaces: [bond0]
       dhcp4: yes
       nameservers:
         addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
