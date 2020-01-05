@@ -4,7 +4,6 @@
 ### Installation steps for BIOS enabled systems:
 1, Open Installer: Click on Menu >> Administration >> Install Ubuntu MATE 19.10
 2, Click through the installer menus as you normally would.
-3, For installation type select: "EXPERIMENTAL: Erase disk and use ZFS".
 
 ### Installation steps for EFI enabled systems:
 1, Open MATE Terminal: Click on Menu >> System Tools >> MATE Terminal
