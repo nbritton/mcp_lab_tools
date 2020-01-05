@@ -57,7 +57,7 @@ systemctl restart xrdp;
 wget http://content.mellanox.com/ofed/MLNX_OFED-4.7-3.2.9.0/MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64.tgz;
 tar -axf MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64.tgz;
 cd MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64/;
-apt -y install tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex;
+apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex;
 ./mlnxofedinstall;
 
 ## Configure Mellanox Card (enable SR-IOV with 16 vf and set port mode to Ethernet only):
