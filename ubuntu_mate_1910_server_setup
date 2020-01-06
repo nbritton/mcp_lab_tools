@@ -131,3 +131,16 @@ network:
         addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
 EOF
 netplan apply;
+
+### Wipe Storage (Distructive) ###
+for disk in /dev/sd{b..v}; do wipefs -a ${disk}; done;
+
+### Setup ZFS Storage Pool ###
+zpool create -O recordsize=64k -O compression=on -O atime=off -o ashift=9 data raidz /dev/sd{b,d,f,h,j,l,n} raidz /dev/sd{c,e,g,i,k,m,o};
+zfs create data/images;
+zfs set mountpoint=/var/lib/libvirt/images data/images;
+chmod a+rx /var/lib/libvirt/images;
+
+### Setup Shared Storage Volumes ###
+for disk in sd{p..v}; do parted --script --align optimal /dev/${disk} mklabel gpt mkpart primary xfs 0% 100% name 1 ${disk}; done;
+for disk in /dev/sd{p..v}1; do mkfs.xfs -f ${disk}; done;
