@@ -1,0 +1,37 @@
+### Build steps for creating custom firmware images for Mellanox ConnectX-2 cards ###
+
+1. Download WinOF version 4.3 or 4.2
+
+2. Run installer in 64-bit Windows, after it extracts the package you can locate it by navigating to %temp% (enter that into File Explorer) and within a sub-folder the firmware building kit will be located, namely fw-ConnectX2-rel.mlx and ConnectX_Flexboot_xxxxx_ROM-3.4.000.mrom
+
+3. On a Linux machine (Ubuntu recommended) copy those files above to it.
+
+4. You will need to install the Mellanox MFT packages, you need the mft-oem package to create new firmwares, it's not installed by default but is available as an optional package in the MFT distribution that is downloadable from Mellanox.
+
+root@m710hd-b04:~# apt-cache policy mft mft-oem
+mft:
+  Installed: 4.13.3-6
+  Candidate: 4.13.3-6
+  Version table:
+ *** 4.13.3-6 100
+        100 /var/lib/dpkg/status
+mft-oem:
+  Installed: 4.13.3-6
+  Candidate: 4.13.3-6
+  Version table:
+ *** 4.13.3-6 100
+        100 /var/lib/dpkg/status
+
+5. mst start
+
+6. flint -d /dev/mst/mt26428_pci_cr0 dc > MLNX-CX2-DEL08F0120009-SRIOV.ini
+
+7. sed '/HCA/a sriov_en = true\nnum_pfs = 1\ntotal_vfs = 16' MLNX-CX2-DEL08F0120009-SRIOV.ini
+
+8. mlxburn -wrimage fw-ConnectX2-rel-2_10_0720-0X24WC_A2-SR-IOV_16_VFs.bin -fw fw-ConnectX2-rel.mlx -conf MLNX-CX2-DEL08F0120009-SRIOV.ini
+
+9. flint -d /dev/mst/mt26428_pci_cr0 -i fw-ConnectX2-rel-2_10_0720-0X24WC_A2-SR-IOV_16_VFs.bin burn
+
+10. flint -d /dev/mst/mt26428_pci_cr0 brom ConnectX_Flexboot_26428_ROM-3.4.000.mrom
+
+11. flint -d /dev/mst/mt26428_pci_cr0 ri fw-ConnectX2-rel-2_10_0720-0X24WC_A2-SR-IOV_16_VFs-FlexBoot-3.4.000.bin
