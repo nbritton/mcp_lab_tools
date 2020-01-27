@@ -91,6 +91,8 @@ update-grub;
 ### Disable UFW - Firewall ###
 systemctl disable ufw;
 systemctl stop ufw;
+ufw disable;
+apt remove -y --purge ufw;
 
 ### Setup Network Dummy Interface ###
 printf "[NetDev]\nName=dummy1\nKind=dummy\n" > /etc/systemd/network/dummy1.netdev;
