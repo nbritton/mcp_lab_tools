@@ -1,0 +1,8 @@
+# Ubuntu MATE 16.04 Lab Server Setup Guide:
+# The following instructions will assist in converting a Ubuntu MATE 16.04 amd64 desktop installation for use on a headless Dell PowerEdge server with an RDP accessible remote desktop.
+
+### Install Dell OpenManage:
+echo 'deb http://linux.dell.com/repo/community/openmanage/911/xenial xenial main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
+gpg -a --export 1285491434D8786F | sudo apt-key add -;
+apt update && apt -y install srvadmin-base srvadmin-webserver srvadmin-idracadm7 syscfg raidcfg dcism
