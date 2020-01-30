@@ -17,7 +17,8 @@ tar -Jcf ~/xrdp-0.9.9-xenial.tar.xz ../xrdp;
 
 # Build xorgxrdp 0.2.9
 # xrdp is a build dependancy for xorgxrdp
-apt -y install autoconf automake debhelper nasm pkg-config x11-utils xrdp xserver-xorg-core xserver-xorg-dev;
+dpkg -i ~/build/xrdp/xrdp_0.9.9-1_amd64.deb;
+apt -y install autoconf automake debhelper nasm pkg-config x11-utils xserver-xorg-core xserver-xorg-dev;
 
 mkdir ~/build/xorgxrdp;
 cd ~/build/xorgxrdp;
