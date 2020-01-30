@@ -3,7 +3,7 @@
 # Build xrdp 0.9.9
 apt -y install build-essential devscripts fakeroot autoconf automake debhelper libfuse-dev libjpeg-dev libopus-dev libpam0g-dev libssl-dev libtool libx11-dev libxfixes-dev libxrandr-dev nasm openssl pkg-config systemd;
 
-mkdir ~/build/xrdp;
+mkdir -p ~/build/xrdp;
 cd ~/build/xrdp;
 wget http://archive.ubuntu.com/ubuntu/pool/universe/x/xrdp/xrdp_0.9.9-1.dsc;
 wget http://archive.ubuntu.com/ubuntu/pool/universe/x/xrdp/xrdp_0.9.9.orig.tar.gz;
