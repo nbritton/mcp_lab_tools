@@ -1,8 +1,24 @@
 # Ubuntu MATE 16.04 Lab Server Setup Guide:
 # The following instructions will assist in converting a Ubuntu MATE 16.04 amd64 desktop installation for use on a headless Dell PowerEdge server with an RDP accessible remote desktop.
 
+### Setup xrdp (for deb packages refer to https://github.com/nbritton/mcp_lab_tools/blob/master/xrdp_xenial_howto.sh)
+dpkg -i xrdp_0.9.9-1ubuntu1_amd64.deb;
+dpkg -i xorgxrdp_0.2.9-1ubuntu1_amd64.deb;
+adduser xrdp ssl-cert;
+systemctl restart xrdp;
+
 ### Install Dell OpenManage:
 echo 'deb http://linux.dell.com/repo/community/openmanage/911/xenial xenial main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
 gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
 gpg -a --export 1285491434D8786F | sudo apt-key add -;
 apt update && apt -y install srvadmin-base srvadmin-webserver srvadmin-idracadm7 syscfg raidcfg dcism
+
+### Enable SR-IOV device passthrough
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="intel_iommu=on iommu=pt /' /etc/default/grub;
+update-grub;
+
+### Setup SR-IOV and hypervisor passthrough on Intel igb devices:
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="pci=assign-busses /' /etc/default/grub;
+update-grub;
+echo -e "options igb max_vfs=7\nblacklist igbvf" > /etc/modprobe.d/igb.conf;
+update-initramfs -u;
