@@ -25,4 +25,4 @@ update-initramfs -u;
 
 ### Enable KVM virtualization:
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
-apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager libvirt-bin;
+apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager libvirt-bin spice-client-gtk;
