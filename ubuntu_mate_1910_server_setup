@@ -148,4 +148,6 @@ for disk in sd{p..v}; do parted --script --align optimal /dev/${disk} mklabel gp
 for disk in /dev/sd{p..v}1; do mkfs.xfs -f ${disk}; done;
 
 ### Setup EFI System Partition ("ESP") & Linux /boot partition on a 4GB USB stick ###
-parted --script --align optimal /dev/sda mklabel gpt mkpart primary fat32 0% 1335 name 1 ESP set 1 esp on mkpart primary ext2 1335 100% name 2 boot
+parted --script --align optimal /dev/sda mklabel gpt mkpart primary fat32 0% 1335 name 1 ESP set 1 esp on mkpart primary ext2 1335 100% name 2 boot;
+mkfs.fat -F32 /dev/sda1;
+mkfs.ext4 -L boot /dev/sda2;
