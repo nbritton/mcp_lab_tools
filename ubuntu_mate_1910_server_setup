@@ -147,7 +147,13 @@ chmod a+rx /var/lib/libvirt/images;
 for disk in sd{p..v}; do parted --script --align optimal /dev/${disk} mklabel gpt mkpart primary xfs 0% 100% name 1 ${disk}; done;
 for disk in /dev/sd{p..v}1; do mkfs.xfs -f ${disk}; done;
 
-### Setup EFI System Partition ("ESP") & Linux /boot partition on a 4GB USB stick ###
+### Setup EFI System Partition ("ESP") & Linux /boot partition on a 4GB USB stick, these steps presume you are booted from a Live USB/ISO image. ###
+apt install -y grub-efi;
 parted --script --align optimal /dev/sda mklabel gpt mkpart primary fat32 0% 1335 name 1 ESP set 1 esp on mkpart primary ext2 1335 100% name 2 boot;
 mkfs.fat -n ESP -F32 /dev/sda1;
 mkfs.ext4 -L boot /dev/sda2;
+grub-install /dev/sda1;
+
+### ZFS on root ###
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:2:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:2:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:5:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:5:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:8:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:8:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:11:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:11:0
+
