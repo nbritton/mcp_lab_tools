@@ -155,6 +155,7 @@ mkfs.ext4 -L boot /dev/sda2;
 grub-install /dev/sda1;
 
 ### ZFS on root ###
+apt install -y debootstrap zfs-initramfs;
 zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:2:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:2:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:5:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:5:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:8:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:8:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:11:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:11:0
 zfs create -o canmount=off -o mountpoint=none rpool/ROOT
 zfs create -o canmount=noauto -o mountpoint=/ rpool/ROOT/ubuntu
@@ -180,3 +181,5 @@ zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/docker
 zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/nfs
 zfs create -o com.sun:auto-snapshot=false  rpool/tmp
 chmod 1777 /mnt/tmp
+debootstrap focal /mnt
+zfs set devices=off rpool
