@@ -65,8 +65,8 @@ mst start;
 mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=16 LINK_TYPE_P1=2 LINK_TYPE_P2=3;
 
 ### Nvidia GPU Compute Drivers:
-apt install nvidia-headless-435 nvidia-utils-435;
 echo "blacklist nouveau" > /etc/modprobe.d/blacklist-nouveau.conf;
+apt install nvidia-headless-435 nvidia-utils-435;
 
 ### Enable KVM virtualization:
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
