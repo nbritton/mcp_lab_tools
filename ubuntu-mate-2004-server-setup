@@ -1,0 +1,185 @@
+# Ubuntu MATE 20.04 Lab Server Setup Guide:
+# The following instructions will assist in converting a Ubuntu MATE 19.10 amd64 desktop installation for use on a headless Dell PowerEdge server with an RDP accessible remote desktop.
+
+### Installation steps for BIOS enabled systems:
+1, Open Installer: Click on Menu >> Administration >> Install Ubuntu MATE 19.10
+2, Click through the installer menus as you normally would.
+
+### Installation steps for EFI enabled systems:
+1, Open MATE Terminal: Click on Menu >> System Tools >> MATE Terminal
+2, Run: sudo apt -y install grub-efi;
+3, Open Installer: Click on Menu >> Administration >> Install Ubuntu MATE 19.10
+4, Click through the installer menus as you normally would.
+
+### Post Install Common Steps:
+
+## Get updates.
+apt update && apt -y upgrade;
+
+## Setup openssh-server
+apt -y install openssh-server ubuntu-server xrdp dkms;
+systemctl enable ssh;
+
+### Enable password-less sudo for users in the sudo group:
+sed -i 's/^%sudo.*ALL$/%sudo\tALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers;
+
+### Setup SSH public key for password-less login:
+install -d -o nbritton -g nbritton -m 700 /home/nbritton/.ssh;
+curl -s https://launchpad.net/%7Enbritton/+sshkeys > /home/nbritton/.ssh/id_rsa.pub;
+chown nbritton:nbritton /home/nbritton/.ssh/id_rsa.pub;
+install -o nbritton -g nbritton -m 600 /home/nbritton/.ssh/id_rsa.pub /home/nbritton/.ssh/authorized_keys;
+
+### Setup SSH client:
+sed -i 's/^#   StrictHostKeyChecking ask/    StrictHostKeyChecking accept-new/' /etc/ssh/ssh_config;
+sed -i 's/^#   Ciphers .*/    Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com/' /etc/ssh/ssh_config;
+
+### Disable password based remote SSH login:
+sed -i 's/^#PasswordAuthentication yes$/PasswordAuthentication no/' /etc/ssh/sshd_config;
+sed -i 's/^UsePAM yes$/#UsePAM yes/' /etc/ssh/sshd_config;
+
+## Disable splash screen, quiet boot, CPU mitigations (i.g. meltdown, spectre), and IPv6.
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT="ipv6.disable=1 mitigations=off"/' /etc/default/grub;
+update-grub;
+
+## Disable GUI on the system console:
+systemctl disable graphical.target;
+systemctl set-default multi-user.target;
+
+## Configure xrdp for remote GUI access with MATE:
+adduser xrdp ssl-cert;
+echo "mate-session" > /root/.xession;
+for user in $(ls /home/); do test -f /home/${user}/.xession || { echo "mate-session" > /home/${user}/.xession; chown ${user}:${user} /home/${user}/.xession; }; done
+echo "mate-session" >> /etc/xrdp/startwm.sh;
+sed -i '/\/etc\/X11\/Xsession/ s/^/#/' /etc/xrdp/startwm.sh;
+systemctl restart xrdp;
+
+### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
+wget http://content.mellanox.com/ofed/MLNX_OFED-4.7-3.2.9.0/MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64.tgz;
+tar -axf MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64.tgz;
+cd MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64/;
+apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex;
+./mlnxofedinstall;
+
+## Configure Mellanox Card (enable SR-IOV with 16 vf and set port mode to Ethernet only):
+mst start;
+mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=16 LINK_TYPE_P1=2 LINK_TYPE_P2=3;
+
+### Nvidia GPU Compute Drivers:
+echo "blacklist nouveau" > /etc/modprobe.d/blacklist-nouveau.conf;
+apt install nvidia-headless-435 nvidia-utils-435;
+
+### Enable KVM virtualization:
+echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
+apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager;
+
+### Install various utilities and essential packages:
+apt -y install bc build-essential chromium-browser cpufrequtils fio htop httpie iftop iotop iozone3 iperf3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep smartmontools socat speedtest-cli stress-ng sysstat vim zfsutils-linux;
+
+### Install Dell OpenManage:
+echo 'deb http://linux.dell.com/repo/community/openmanage/932/bionic bionic main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
+gpg -a --export 1285491434D8786F | sudo apt-key add -;
+apt update && apt -y install srvadmin-all syscfg raidcfg dcism;
+exit;
+sudo -i;
+apt -y install --reinstall srvadmin-all;
+
+### Force enable x2APIC mode:
+sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="intremap=no_x2apic_optout /' /etc/default/grub;
+update-grub;
+
+### Disable UFW - Firewall ###
+systemctl disable ufw;
+systemctl stop ufw;
+ufw disable;
+apt remove -y --purge ufw;
+
+### Setup Network Dummy Interface ###
+printf "[NetDev]\nName=dummy1\nKind=dummy\n" > /etc/systemd/network/dummy1.netdev;
+systemctl restart systemd-networkd.service;
+
+### Netplan configuration ###
+mv /etc/netplan/01-network-manager-all.yaml /root/;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    eno3: {mtu: 9000}
+    eno4: {mtu: 9000}
+    enp66s0: {mtu: 9000}
+    ibp66s0d1:
+      addresses: [192.168.144.10/24]
+
+  bonds:
+    bond0:
+      mtu: 9000
+      interfaces: [enp66s0, eno1]
+      parameters:
+        primary: enp66s0
+        mode: balance-alb
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+        primary-reselect-policy: better
+
+  bridges:
+    internet:
+      interfaces: [bond0]
+      dhcp4: yes
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+EOF
+netplan apply;
+
+### Wipe Storage (Distructive) ###
+for disk in /dev/sd{b..v}; do wipefs -a ${disk}; done;
+
+### Setup ZFS Storage Pool ###
+zpool create -O recordsize=64k -O compression=on -O atime=off -o ashift=9 data raidz /dev/sd{b,d,f,h,j,l,n} raidz /dev/sd{c,e,g,i,k,m,o};
+zfs create data/images;
+zfs set mountpoint=/var/lib/libvirt/images data/images;
+chmod a+rx /var/lib/libvirt/images;
+
+### Setup Shared Storage Volumes ###
+for disk in sd{p..v}; do parted --script --align optimal /dev/${disk} mklabel gpt mkpart primary xfs 0% 100% name 1 ${disk}; done;
+for disk in /dev/sd{p..v}1; do mkfs.xfs -f ${disk}; done;
+
+### Setup EFI System Partition ("ESP") & Linux /boot partition on a 4GB USB stick, these steps presume you are booted from a Live USB/ISO image. ###
+apt install -y grub-efi;
+parted --script --align optimal /dev/sda mklabel gpt mkpart primary fat32 0% 1335 name 1 ESP set 1 esp on mkpart primary ext2 1335 100% name 2 boot;
+mkfs.fat -n ESP -F32 /dev/sda1;
+mkfs.ext4 -L boot /dev/sda2;
+grub-install /dev/sda1;
+
+### ZFS on root ###
+apt install -y debootstrap zfs-initramfs;
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:2:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:2:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:5:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:5:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:8:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:8:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:11:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:11:0
+zfs create -o canmount=off -o mountpoint=none rpool/ROOT
+zfs create -o canmount=noauto -o mountpoint=/ rpool/ROOT/ubuntu
+zfs mount rpool/ROOT/ubuntu
+zfs create                                 rpool/home
+zfs create -o mountpoint=/root             rpool/home/root
+zfs create -o canmount=off                 rpool/var
+zfs create -o canmount=off                 rpool/var/lib
+zfs create                                 rpool/var/log
+zfs create                                 rpool/var/spool
+zfs create -o com.sun:auto-snapshot=false  rpool/var/cache
+zfs create -o com.sun:auto-snapshot=false  rpool/var/tmp
+chmod 1777 /mnt/var/tmp
+zfs create                                 rpool/opt
+zfs create                                 rpool/srv
+zfs create -o canmount=off                 rpool/usr
+zfs create                                 rpool/usr/local
+zfs create                                 rpool/var/mail
+zfs create                                 rpool/var/snap
+zfs create                                 rpool/var/www
+zfs create                                 rpool/var/lib/AccountsService
+zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/docker
+zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/nfs
+zfs create -o com.sun:auto-snapshot=false  rpool/tmp
+chmod 1777 /mnt/tmp
+debootstrap focal /mnt
+zfs set devices=off rpool
