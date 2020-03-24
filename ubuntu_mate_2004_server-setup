@@ -131,7 +131,8 @@ apt install -y glusterfs-client glusterfs-common glusterfs-server;
 for disk in /dev/sd{b..v}; do wipefs -a ${disk}; done;
 
 ### Setup ZFS Storage Pool ###
-zpool create -O recordsize=64k -O compression=on -O atime=off -o ashift=9 data raidz /dev/sd{b,d,f,h,j,l,n} raidz /dev/sd{c,e,g,i,k,m,o};
+zpool create -O recordsize=64k -O compression=on -O atime=off -o ashift=9 data raidz /dev/sd{b,f,c,g,d,h,e,i};
+
 zfs create data/images;
 zfs set mountpoint=/var/lib/libvirt/images data/images;
 chmod a+rx /var/lib/libvirt/images;
