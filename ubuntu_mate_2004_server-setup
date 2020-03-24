@@ -124,6 +124,9 @@ network:
 EOF
 netplan apply;
 
+### Install GlusterFS ###
+apt install -y glusterfs-client glusterfs-common glusterfs-server;
+
 ### Wipe Storage (Distructive) ###
 for disk in /dev/sd{b..v}; do wipefs -a ${disk}; done;
 
