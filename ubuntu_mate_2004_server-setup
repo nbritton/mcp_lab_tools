@@ -48,9 +48,10 @@ rmmod rdma_ucm;
 rmmod rdma_cm;
 ./mlnxofedinstall;
 
-## Configure Mellanox Card (enable SR-IOV with 16 vf and set port mode to Ethernet only):
+## Configure Mellanox Card:
 mst start;
-mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=16 LINK_TYPE_P1=2 LINK_TYPE_P2=3;
+mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=0 LINK_TYPE_P1=1 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0
+mlxconfig -d /dev/mst/mt4099_pciconf1 set SRIOV_EN=1 NUM_OF_VFS=8 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
 
 ### Nvidia GPU Compute Drivers:
 echo "blacklist nouveau" > /etc/modprobe.d/blacklist-nouveau.conf;
@@ -87,7 +88,7 @@ printf "[NetDev]\nName=dummy1\nKind=dummy\n" > /etc/systemd/network/dummy1.netde
 systemctl restart systemd-networkd.service;
 
 ### Netplan configuration ###
-mv /etc/netplan/01-network-manager-all.yaml /root/;
+rm /etc/netplan/01-network-manager-all.yaml;
 cat << 'EOF' > /etc/netplan/01-netcfg.yaml
 network:
   version: 2
@@ -98,23 +99,24 @@ network:
     eno2: {mtu: 9000}
     eno3: {mtu: 9000}
     eno4: {mtu: 9000}
-    enp66s0: {mtu: 9000}
-    ibp66s0d1:
+    enp65s0: {mtu: 9000}
+    enp65s0d1: {mtu: 9000}
+    ibp3s0:
       addresses: [192.168.144.10/24]
 
   bonds:
     bond0:
       mtu: 9000
-      interfaces: [enp66s0, eno1]
+      interfaces: [enp65s0, enp65s0d1]
       parameters:
-        primary: enp66s0
-        mode: balance-alb
+        mode: 802.3ad
+        lacp-rate: fast
         mii-monitor-interval: 100
         transmit-hash-policy: layer3+4
-        primary-reselect-policy: better
 
   bridges:
     internet:
+      mtu: 9000
       interfaces: [bond0]
       dhcp4: yes
       nameservers:
