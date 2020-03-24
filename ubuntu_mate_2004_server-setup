@@ -44,6 +44,8 @@ wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-1.0.0.0/MLNX_OFED_LINUX-5.0-
 tar -axf MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64.tgz;
 cd MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64/;
 apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex libnl-3-dev libnl-route-3-dev;
+rmmod rdma_ucm;
+rmmod rdma_cm;
 ./mlnxofedinstall;
 
 ## Configure Mellanox Card (enable SR-IOV with 16 vf and set port mode to Ethernet only):
