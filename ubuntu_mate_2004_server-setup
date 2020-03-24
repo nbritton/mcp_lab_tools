@@ -1,15 +1,5 @@
 # Ubuntu MATE 20.04 Lab Server Setup Guide:
-# The following instructions will assist in converting a Ubuntu MATE 19.10 amd64 desktop installation for use on a headless Dell PowerEdge server with an RDP accessible remote desktop.
-
-### Installation steps for BIOS enabled systems:
-1, Open Installer: Click on Menu >> Administration >> Install Ubuntu MATE 19.10
-2, Click through the installer menus as you normally would.
-
-### Installation steps for EFI enabled systems:
-1, Open MATE Terminal: Click on Menu >> System Tools >> MATE Terminal
-2, Run: sudo apt -y install grub-efi;
-3, Open Installer: Click on Menu >> Administration >> Install Ubuntu MATE 19.10
-4, Click through the installer menus as you normally would.
+# The following instructions will assist in converting a Ubuntu MATE 20.04 amd64 desktop installation for use on a headless Dell PowerEdge server with an RDP accessible remote desktop.
 
 ### Post Install Common Steps:
 
@@ -47,17 +37,13 @@ systemctl set-default multi-user.target;
 
 ## Configure xrdp for remote GUI access with MATE:
 adduser xrdp ssl-cert;
-echo "mate-session" > /root/.xession;
-for user in $(ls /home/); do test -f /home/${user}/.xession || { echo "mate-session" > /home/${user}/.xession; chown ${user}:${user} /home/${user}/.xession; }; done
-echo "mate-session" >> /etc/xrdp/startwm.sh;
-sed -i '/\/etc\/X11\/Xsession/ s/^/#/' /etc/xrdp/startwm.sh;
 systemctl restart xrdp;
 
 ### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
-wget http://content.mellanox.com/ofed/MLNX_OFED-4.7-3.2.9.0/MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64.tgz;
-tar -axf MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64.tgz;
-cd MLNX_OFED_LINUX-4.7-3.2.9.0-ubuntu19.10-x86_64/;
-apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex;
+wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-1.0.0.0/MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64.tgz;
+tar -axf MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64.tgz;
+cd MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64/;
+apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex libnl-3-dev libnl-route-3-dev;
 ./mlnxofedinstall;
 
 ## Configure Mellanox Card (enable SR-IOV with 16 vf and set port mode to Ethernet only):
@@ -66,7 +52,7 @@ mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=16 LINK_TYPE_P1=
 
 ### Nvidia GPU Compute Drivers:
 echo "blacklist nouveau" > /etc/modprobe.d/blacklist-nouveau.conf;
-apt install nvidia-headless-435 nvidia-utils-435;
+apt install nvidia-headless-440 nvidia-utils-440;
 
 ### Enable KVM virtualization:
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
@@ -76,7 +62,7 @@ apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux
 apt -y install bc build-essential chromium-browser cpufrequtils fio htop httpie iftop iotop iozone3 iperf3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep smartmontools socat speedtest-cli stress-ng sysstat vim zfsutils-linux;
 
 ### Install Dell OpenManage:
-echo 'deb http://linux.dell.com/repo/community/openmanage/932/bionic bionic main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+echo 'deb http://linux.dell.com/repo/community/openmanage/940/bionic bionic main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
 gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
 gpg -a --export 1285491434D8786F | sudo apt-key add -;
 apt update && apt -y install srvadmin-all syscfg raidcfg dcism;
