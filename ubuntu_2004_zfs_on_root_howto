@@ -1,3 +1,11 @@
+# This is a modified procedure for running ZFS on root on Ubuntu. It mostly follows the standard process, but rather then using a bpool (boot pool) it instead uses an SD card, USB flash, or other 1GB ~ 8GB device for storing the EFI System Partition and /boot on a traditional ext4 filesystem. The bpool felt like too much of a hack for any kind of production environment so I tossed it.
+#
+# Source references:
+# https://github.com/openzfs/zfs/wiki/Ubuntu-18.04-Root-on-ZFS
+# https://askubuntu.com/questions/831216/how-can-i-reinstall-grub-to-the-efi-partition
+# https://www.linux.com/training-tutorials/how-rescue-non-booting-grub-2-linux/
+
+# Partition USB flash / SD Card, gpt1 is fat32 for EFI System Partition and gpt2 is Ext4 for /boot. Change /dev/sdq to your device name. Also change 2048 if you're not using an 8GB device. EFI needs at least 512MB, and /boot needs at least 256MB... but 1024MB or more is recommended. 
 parted --script --align optimal /dev/sdq mklabel gpt mkpart primary fat32 0% 2048 name 1 ESP set 1 esp on mkpart primary ext2 2048 100% name 2 boot;
 mkfs.fat -n ESP -F32 /dev/sdq1;
 mkfs.ext4 -L boot /dev/sdq2;
