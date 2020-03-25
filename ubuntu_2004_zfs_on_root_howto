@@ -1,0 +1,149 @@
+parted --script --align optimal /dev/sdq mklabel gpt mkpart primary fat32 0% 2048 name 1 ESP set 1 esp on mkpart primary ext2 2048 100% name 2 boot;
+mkfs.fat -n ESP -F32 /dev/sdq1;
+mkfs.ext4 -L boot /dev/sdq2;
+
+apt install -y openssh-server zfsutils-linux grub-efi;
+ 
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz /dev/disk/by-path/pci-0000\:42\:00.0-scsi-0\:0\:{0..7}:0;
+
+zfs create -o canmount=off -o mountpoint=none rpool/ROOT
+zfs create -o canmount=noauto -o mountpoint=/ rpool/ROOT/ubuntu
+zfs mount rpool/ROOT/ubuntu
+zfs create                                 rpool/home
+zfs create -o mountpoint=/root             rpool/home/root
+zfs create -o canmount=off                 rpool/var
+zfs create -o canmount=off                 rpool/var/lib
+zfs create                                 rpool/var/log
+zfs create                                 rpool/var/spool
+zfs create -o com.sun:auto-snapshot=false  rpool/var/cache
+zfs create -o com.sun:auto-snapshot=false  rpool/var/tmp
+chmod 1777 /mnt/var/tmp
+zfs create                                 rpool/opt
+zfs create                                 rpool/srv
+zfs create -o canmount=off                 rpool/usr
+zfs create                                 rpool/usr/local
+zfs create                                 rpool/var/mail
+zfs create                                 rpool/var/snap
+zfs create                                 rpool/var/www
+zfs create                                 rpool/var/lib/AccountsService
+zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/docker
+zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/nfs
+zfs create -o com.sun:auto-snapshot=false  rpool/tmp
+chmod 1777 /mnt/tmp
+
+mkdir -p /mnt/boot;
+mount /dev/sdq2 /mnt/boot;
+mkdir -p /mnt/boot/efi;
+mount /dev/sdq1 /mnt/boot/efi;
+
+debootstrap focal /mnt;
+zfs set devices=off rpool;
+
+echo "r820-jq3xl02" > /mnt/etc/hostname;
+echo "127.0.1.1       r820-jq3xl02.exabit.io r820-jq3xl02" >> /mnt/etc/hosts;
+uuidgen | tr -d '-' > /mnt/etc/machine-id;
+
+cat << 'EOF' > /mnt/etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    eno3: {mtu: 9000}
+    eno4: {mtu: 9000}
+    enp65s0: {mtu: 9000}
+    enp65s0d1: {mtu: 9000}
+    ibp3s0:
+      addresses: [192.168.144.10/24]
+
+  bonds:
+    bond0:
+      mtu: 9000
+      interfaces: [enp65s0, enp65s0d1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+  bridges:
+    internet:
+      mtu: 9000
+      interfaces: [bond0]
+      dhcp4: yes
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+EOF
+
+cat << 'EOF' > /mnt/etc/apt/sources.list;
+deb http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+
+deb http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+deb-src http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+
+deb http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+
+deb http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+EOF
+
+mount --rbind /dev  /mnt/dev;
+mount --rbind /proc /mnt/proc;
+mount --rbind /sys  /mnt/sys;
+chroot /mnt bash --login;
+
+ln -s /proc/self/mounts /etc/mtab;
+apt update;
+dpkg-reconfigure locales;
+dpkg-reconfigure tzdata;
+
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
+
+vim /etc/fstab;
+UUID=d812ee3f-30c4-418d-bfee-613352d28533 /boot               ext2    errors=remount-ro 0       1
+UUID=90EE-83EB  /boot/efi       vfat    umask=0077      0       1
+
+apt install --yes vim nano zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi linux-image-generic linux-headers-generic;
+
+apt install -y grub-efi;
+grub-install /dev/sdq;
+passwd;
+adduser nbritton;
+addgroup --system lpadmin;
+addgroup --system sambashare;
+
+update-initramfs -c -k all;
+update-grub;
+
+zfs set mountpoint=legacy rpool/var/log;
+echo rpool/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/var/spool;
+echo rpool/var/spool /var/spool zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/var/tmp;
+echo rpool/var/tmp /var/tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/tmp;
+echo rpool/tmp /tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+
+zfs snapshot rpool/ROOT/ubuntu@install;
+
+exit;
+
+mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
+zpool export -a
+
+
+
+
+
+for i in /dev /dev/pts /proc /sys /run; do sudo mount -B $i /mnt$i; done
+sudo chroot /mnt
+grub-install /dev/sdq
+update-grub  
