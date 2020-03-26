@@ -182,11 +182,18 @@ zpool export -a;
 
 reboot;
 
-# The system might boot up normally, but chances are high you'll only get to a grub prompt, do the following if that happens:
+# The system might boot up normally, but chances are you may only get to a grub prompt, do the following if that happens:
 grub> set root=(hd0,gpt2)
 grub> linux /vmlinuz-5.4.0-18-generic root=ZFS=rpool/ROOT/ubuntu
 grub> initrd /boot/initrd.img-5.4.0-18-generic
 grub> boot
 
-# Post install / after reboot into new system. 
-adduser nbritton;
+# Post install / after reboot into new system.
+zfs create rpool/home/YOURUSERNAME;
+adduser YOURUSERNAME;
+cp -a /etc/skel/. /home/YOURUSERNAME;
+chown -R YOURUSERNAME:YOURUSERNAME /home/YOURUSERNAME;
+
+# Rerun update-grub and update-iniramfs
+update-grub;
+update-initramfs -u -k all;
