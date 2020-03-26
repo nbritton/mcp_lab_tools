@@ -69,8 +69,13 @@ debootstrap focal /mnt;
 zfs set devices=off rpool;
 
 # Configure hostname, /etc/hosts, /etc/machine-id.
-echo "r820-jq3xl02" > /mnt/etc/hostname;
-echo "127.0.1.1       r820-jq3xl02.exabit.io r820-jq3xl02" >> /mnt/etc/hosts;
+# echo "r820-jq3xl02" > /mnt/etc/hostname;
+# echo "127.0.1.1       r820-jq3xl02.exabit.io r820-jq3xl02" >> /mnt/etc/hosts;
+
+HOSTNAME=$(dmidecode -t 1 | awk '/Product/ {printf tolower($NF"-")}'; dmidecode -t 1 | awk '/Serial/ {print tolower($NF)}');
+echo "$HOSTNAME" > /mnt/etc/hostname;
+echo "127.0.1.1       $HOSTNAME.exabit.io $HOSTNAME" >> /mnt/etc/hosts;
+
 uuidgen | tr -d '-' > /mnt/etc/machine-id;
 
 # Configure networking.
