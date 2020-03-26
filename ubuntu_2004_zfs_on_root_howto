@@ -144,18 +144,10 @@ grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '
 
 apt install -y linux-image-generic linux-headers-generic linux-tools-generic;
 
+grub-mkconfig -o /boot/grub/grub.cfg;
 
-
-
-apt install -y grub-efi;
-grub-install /dev/sdq;
-passwd;
-adduser nbritton;
 addgroup --system lpadmin;
 addgroup --system sambashare;
-
-update-initramfs -c -k all;
-update-grub;
 
 zfs set mountpoint=legacy rpool/var/log;
 echo rpool/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab;
@@ -169,19 +161,22 @@ echo rpool/var/tmp /var/tmp zfs nodev,relatime 0 0 >> /etc/fstab;
 zfs set mountpoint=legacy rpool/tmp;
 echo rpool/tmp /tmp zfs nodev,relatime 0 0 >> /etc/fstab;
 
+sed -i 's/GRUB_TIMEOUT_STYLE=hidden/#GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub;
+sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=10/' /etc/default/grub;
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT=""/' /etc/default/grub;
+update-grub;
+
+update-initramfs -u -k all;
 
 zfs snapshot rpool/ROOT/ubuntu@install;
+
+ls /boot/grub/*/zfs.mod;
 
 exit;
 
 mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
-zpool export -a
 
+zpool export -a;
 
-
-
-
-for i in /dev /dev/pts /proc /sys /run; do sudo mount -B $i /mnt$i; done
-sudo chroot /mnt
-grub-install /dev/sdq
-update-grub  
+# Post install / after reboot into new system. 
+adduser nbritton;
