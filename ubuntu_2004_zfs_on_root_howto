@@ -72,7 +72,7 @@ echo "r820-jq3xl02" > /mnt/etc/hostname;
 echo "127.0.1.1       r820-jq3xl02.exabit.io r820-jq3xl02" >> /mnt/etc/hosts;
 uuidgen | tr -d '-' > /mnt/etc/machine-id;
 
-# Configure neetworking.
+# Configure networking.
 cat << 'EOF' > /mnt/etc/netplan/01-netcfg.yaml;
 network:
   version: 2
@@ -141,7 +141,7 @@ echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '
 
 apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
 
-sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu' /etc/default/grub;
 
 grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
 
