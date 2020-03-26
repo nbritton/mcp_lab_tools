@@ -8,7 +8,8 @@
 # https://askubuntu.com/questions/831216/how-can-i-reinstall-grub-to-the-efi-partition
 # https://www.linux.com/training-tutorials/how-rescue-non-booting-grub-2-linux/
 
-# Boot Ubuntu Mate desktop live DVD ISO... 18.04, 19.10, and/or 20.04 ISO will all get the job done.
+# Boot a Ubuntu Mate desktop live DVD ISO... versions 18.04, 19.04, 19.10, or 20.04 ISO will all work.
+# https://ubuntu-mate.org/download/
 # Open up terminal, run:
 sudo -i;
 apt install -y openssh-server zfsutils-linux debootstrap;
