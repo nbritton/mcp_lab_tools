@@ -8,6 +8,17 @@
 # https://askubuntu.com/questions/831216/how-can-i-reinstall-grub-to-the-efi-partition
 # https://www.linux.com/training-tutorials/how-rescue-non-booting-grub-2-linux/
 
+# Boot Ubuntu Mate desktop live DVD ISO... 18.04, 19.10, and/or 20.04 ISO will all get the job done.
+# Open up terminal, run:
+# sudo -i;
+# apt install -y openssh-server zfsutils-linux debootstrap;
+# echo "ubuntu-mate:password" | chpasswd;
+# ip a | grep inet;
+# SSH into the live image from another machine using the ubuntu-mate userid.
+
+# Wipe disks, for example this will wipe every scsi disk:
+wipefs -af /dev/sd{a..z};
+
 # Partition USB flash / SD Card, gpt1 is fat32 for EFI System Partition and gpt2 is Ext4 for /boot. Change /dev/sdq to your
 # device name. Also change 2048 if you're not using an 8GB device. EFI needs at least 512MB, and /boot needs at least 256MB...
 # but 1024MB or more is recommended. 
@@ -15,8 +26,7 @@ parted --script --align optimal /dev/sdq mklabel gpt mkpart primary fat32 0% 204
 mkfs.fat -n ESP -F32 /dev/sdq1;
 mkfs.ext4 -L boot /dev/sdq2;
 
-apt install -y openssh-server zfsutils-linux grub-efi;
- 
+# Create the zpool to your liking, i.g. raidz, raidz2, raidz3, etc.
 zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz /dev/disk/by-path/pci-0000\:42\:00.0-scsi-0\:0\:{0..7}:0;
 
 zfs create -o canmount=off -o mountpoint=none rpool/ROOT
@@ -44,9 +54,9 @@ zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/nfs
 zfs create -o com.sun:auto-snapshot=false  rpool/tmp
 chmod 1777 /mnt/tmp
 
-mkdir -p /mnt/boot;
+mkdir /mnt/boot;
 mount /dev/sdq2 /mnt/boot;
-mkdir -p /mnt/boot/efi;
+mkdir /mnt/boot/efi;
 mount /dev/sdq1 /mnt/boot/efi;
 
 debootstrap focal /mnt;
