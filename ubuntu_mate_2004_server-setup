@@ -84,8 +84,11 @@ systemctl stop ufw;
 ufw disable;
 apt remove -y --purge ufw;
 
+### Remove network manager, as we use networkd and netplan instead ###
+apt remove -y --purge network-manager;
+
 ### Setup Network Dummy Interface ###
-printf "[NetDev]\nName=dummy1\nKind=dummy\n" > /etc/systemd/network/dummy1.netdev;
+for i in $(seq 6); do printf "[NetDev]\nName=dummy${i}\nKind=dummy\n" > /etc/systemd/network/dummy${i}.netdev; done
 systemctl restart systemd-networkd.service;
 
 ### Netplan configuration ###
@@ -132,7 +135,7 @@ apt install -y glusterfs-client glusterfs-common glusterfs-server;
 for disk in /dev/sd{b..v}; do wipefs -a ${disk}; done;
 
 ### Setup ZFS Storage Pool ###
-zpool create -O recordsize=64k -O compression=on -O atime=off -o ashift=9 data raidz /dev/sd{b,f,c,g,d,h,e,i};
+zpool create -O recordsize=64k -O compression=on -O atime=off -o ashift=9 data raidz /dev/disk/by-path/pci-0000\:42\:00.0-scsi-0\:0\:{8..15}:0;
 
 zfs create data/images;
 zfs set mountpoint=/var/lib/libvirt/images data/images;
@@ -141,40 +144,3 @@ chmod a+rx /var/lib/libvirt/images;
 ### Setup Shared Storage Volumes ###
 for disk in sd{p..v}; do parted --script --align optimal /dev/${disk} mklabel gpt mkpart primary xfs 0% 100% name 1 ${disk}; done;
 for disk in /dev/sd{p..v}1; do mkfs.xfs -f ${disk}; done;
-
-### Setup EFI System Partition ("ESP") & Linux /boot partition on a 4GB USB stick, these steps presume you are booted from a Live USB/ISO image. ###
-apt install -y grub-efi;
-parted --script --align optimal /dev/sda mklabel gpt mkpart primary fat32 0% 1335 name 1 ESP set 1 esp on mkpart primary ext2 1335 100% name 2 boot;
-mkfs.fat -n ESP -F32 /dev/sda1;
-mkfs.ext4 -L boot /dev/sda2;
-grub-install /dev/sda1;
-
-### ZFS on root ###
-apt install -y debootstrap zfs-initramfs;
-zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:0:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:1:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:2:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:2:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:3:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:4:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:5:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:5:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:6:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:7:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:8:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:8:0 raidz /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:9:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:10:0 /dev/disk/by-path/pci-0000:03:00.0-scsi-0:2:11:0 /dev/disk/by-path/pci-0000:61:00.0-scsi-0:2:11:0
-zfs create -o canmount=off -o mountpoint=none rpool/ROOT
-zfs create -o canmount=noauto -o mountpoint=/ rpool/ROOT/ubuntu
-zfs mount rpool/ROOT/ubuntu
-zfs create                                 rpool/home
-zfs create -o mountpoint=/root             rpool/home/root
-zfs create -o canmount=off                 rpool/var
-zfs create -o canmount=off                 rpool/var/lib
-zfs create                                 rpool/var/log
-zfs create                                 rpool/var/spool
-zfs create -o com.sun:auto-snapshot=false  rpool/var/cache
-zfs create -o com.sun:auto-snapshot=false  rpool/var/tmp
-chmod 1777 /mnt/var/tmp
-zfs create                                 rpool/opt
-zfs create                                 rpool/srv
-zfs create -o canmount=off                 rpool/usr
-zfs create                                 rpool/usr/local
-zfs create                                 rpool/var/mail
-zfs create                                 rpool/var/snap
-zfs create                                 rpool/var/www
-zfs create                                 rpool/var/lib/AccountsService
-zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/docker
-zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/nfs
-zfs create -o com.sun:auto-snapshot=false  rpool/tmp
-chmod 1777 /mnt/tmp
-debootstrap focal /mnt
-zfs set devices=off rpool
