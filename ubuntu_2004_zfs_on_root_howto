@@ -10,10 +10,10 @@
 
 # Boot Ubuntu Mate desktop live DVD ISO... 18.04, 19.10, and/or 20.04 ISO will all get the job done.
 # Open up terminal, run:
-# sudo -i;
-# apt install -y openssh-server zfsutils-linux debootstrap;
-# echo "ubuntu-mate:password" | chpasswd;
-# ip a | grep inet;
+sudo -i;
+apt install -y openssh-server zfsutils-linux debootstrap;
+echo "ubuntu-mate:password" | chpasswd;
+ip a | grep inet;
 # SSH into the live image from another machine using the ubuntu-mate user id.
 
 # Wipe disks, for example this will wipe every scsi disk:
