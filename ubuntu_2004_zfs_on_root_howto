@@ -1,4 +1,4 @@
-# This is a modified procedure for running ZFS on root on Ubuntu. It mostly follows the standard process (https://github.com/openzfs/zfs/wiki/Ubuntu-18.04-Root-on-ZFS), but rather then
+# This is a modified procedure for running ZFS on root on Ubuntu. It mostly follows the standard process, but rather then
 # using a bpool (boot pool) it instead uses an SD card, USB flash, or other 1GB ~ 8GB device for storing the EFI System
 # Partition and /boot on a traditional ext4 filesystem. The bpool felt like too much of a hack for any kind of production
 # environment so I tossed it.
