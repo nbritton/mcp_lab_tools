@@ -45,6 +45,7 @@ tar -axf MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64.tgz;
 cd MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64/;
 apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex libnl-3-dev libnl-route-3-dev;
 rmmod rdma_ucm;
+rmmod ib_iser rpcrdma;
 rmmod rdma_cm;
 ./mlnxofedinstall;
 
