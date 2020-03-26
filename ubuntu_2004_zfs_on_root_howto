@@ -168,15 +168,17 @@ update-grub;
 
 update-initramfs -u -k all;
 
-zfs snapshot rpool/ROOT/ubuntu@install;
-
 ls /boot/grub/*/zfs.mod;
+
+zfs snapshot rpool/ROOT/ubuntu@install;
 
 exit;
 
-mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
+mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {};
 
 zpool export -a;
+
+reboot;
 
 # Post install / after reboot into new system. 
 adduser nbritton;
