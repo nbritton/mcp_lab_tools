@@ -133,7 +133,7 @@ dpkg-reconfigure locales; # aways also select en_US.UTF-8 in addition to any oth
 dpkg-reconfigure tzdata;
 
 # Add /boot and EFI System Partition to /etc/fstab.
-echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext2 errors=remount-ro 0 1" >> /etc/fstab;
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext4 errors=remount-ro 0 1" >> /etc/fstab;
 echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
 
 apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
@@ -181,6 +181,12 @@ mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {};
 zpool export -a;
 
 reboot;
+
+# The system might boot up normally, but chances are high you'll only get to a grub prompt, do the following if that happens:
+grub> set root=(hd0,gpt2)
+grub> linux /vmlinuz-5.4.0-18-generic root=ZFS=rpool/ROOT/ubuntu
+grub> initrd /boot/initrd.img-5.4.0-18-generic
+grub> boot
 
 # Post install / after reboot into new system. 
 adduser nbritton;
