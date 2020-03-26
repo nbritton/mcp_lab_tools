@@ -14,7 +14,7 @@
 # apt install -y openssh-server zfsutils-linux debootstrap;
 # echo "ubuntu-mate:password" | chpasswd;
 # ip a | grep inet;
-# SSH into the live image from another machine using the ubuntu-mate userid.
+# SSH into the live image from another machine using the ubuntu-mate user id.
 
 # Wipe disks, for example this will wipe every scsi disk:
 wipefs -af /dev/sd{a..z};
@@ -54,18 +54,22 @@ zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/nfs
 zfs create -o com.sun:auto-snapshot=false  rpool/tmp
 chmod 1777 /mnt/tmp
 
+# Mount EFI System Partition and /boot into the ZFS directory structure.
 mkdir /mnt/boot;
 mount /dev/sdq2 /mnt/boot;
 mkdir /mnt/boot/efi;
 mount /dev/sdq1 /mnt/boot/efi;
 
+# Installation takes place using debootstrap.
 debootstrap focal /mnt;
 zfs set devices=off rpool;
 
+# Configure hostname, /etc/hosts, /etc/machine-id.
 echo "r820-jq3xl02" > /mnt/etc/hostname;
 echo "127.0.1.1       r820-jq3xl02.exabit.io r820-jq3xl02" >> /mnt/etc/hosts;
 uuidgen | tr -d '-' > /mnt/etc/machine-id;
 
+# Configure neetworking.
 cat << 'EOF' > /mnt/etc/netplan/01-netcfg.yaml;
 network:
   version: 2
@@ -100,6 +104,7 @@ network:
         addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
 EOF
 
+# Configure apt sources.
 cat << 'EOF' > /mnt/etc/apt/sources.list;
 deb http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
 deb-src http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
@@ -114,23 +119,33 @@ deb http://archive.ubuntu.com/ubuntu focal-backports main restricted universe mu
 deb-src http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
 EOF
 
+# Bind special filesystems and chroot into the new debootstrap install.
 mount --rbind /dev  /mnt/dev;
 mount --rbind /proc /mnt/proc;
 mount --rbind /sys  /mnt/sys;
 chroot /mnt bash --login;
-
+rm /etc/mtab;
 ln -s /proc/self/mounts /etc/mtab;
+
+# Update apt package metadata and reconfigure locale and timezone.
 apt update;
-dpkg-reconfigure locales;
+dpkg-reconfigure locales; # aways also select en_US.UTF-8 in addition to any other dialects.
 dpkg-reconfigure tzdata;
+
+# Add /boot and EFI System Partition to /etc/fstab.
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext2 errors=remount-ro 0 1" >> /etc/fstab;
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
+
+apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
 
 sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
 
-vim /etc/fstab;
-UUID=d812ee3f-30c4-418d-bfee-613352d28533 /boot               ext2    errors=remount-ro 0       1
-UUID=90EE-83EB  /boot/efi       vfat    umask=0077      0       1
+grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
 
-apt install --yes vim nano zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi linux-image-generic linux-headers-generic;
+apt install -y linux-image-generic linux-headers-generic linux-tools-generic;
+
+
+
 
 apt install -y grub-efi;
 grub-install /dev/sdq;
