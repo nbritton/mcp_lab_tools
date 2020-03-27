@@ -191,7 +191,7 @@ zpool export -a;
 
 reboot;
 
-# The system might boot up normally, but chances are you may only get to a grub prompt, do the following if that happens:
+# The system should boot up normally, but chances are you may only get to a grub prompt, do the following if that happens:
 grub> set root=(hd0,gpt2)
 grub> linux /vmlinuz-5.4.0-18-generic root=ZFS=rpool/ROOT/ubuntu
 grub> initrd /boot/initrd.img-5.4.0-18-generic
