@@ -63,7 +63,7 @@ echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
 apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager;
 
 ### Install various utilities and essential packages:
-apt -y install bc build-essential chromium-browser cpufrequtils fio htop httpie iftop iotop iozone3 iperf3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep smartmontools socat speedtest-cli stress-ng sysstat vim zfsutils-linux;
+apt -y install bash-completion bash-doc bc build-essential chromium-browser command-not-found cpufrequtils fio htop httpie iftop iotop iozone3 iperf3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep smartmontools socat speedtest-cli stress-ng sysstat vim zfsutils-linux;
 
 ### Install Dell OpenManage:
 echo 'deb http://linux.dell.com/repo/community/openmanage/940/bionic bionic main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
