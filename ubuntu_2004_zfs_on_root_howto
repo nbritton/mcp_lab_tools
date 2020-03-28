@@ -202,7 +202,7 @@ zfs create rpool/home/YOURUSERNAME;
 adduser YOURUSERNAME;
 cp -a /etc/skel/. /home/YOURUSERNAME;
 chown -R YOURUSERNAME:YOURUSERNAME /home/YOURUSERNAME;
-usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo YOURUSERNAMEl
+usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo YOURUSERNAME;
 
 # Rerun update-grub and update-iniramfs
 update-grub;
