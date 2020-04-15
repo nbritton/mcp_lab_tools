@@ -93,17 +93,28 @@ EOF
 
 # Configure apt sources.
 cat << 'EOF' > /mnt/etc/apt/sources.list;
-deb http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
-deb-src http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-security main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-updates main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-backports main restricted universe multiverse
 
-deb http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
-deb-src http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-security main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-updates main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-backports main restricted universe multiverse
 
-deb http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
-deb-src http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-security main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-updates main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-backports main restricted universe multiverse
 
-deb http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
-deb-src http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-security main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-updates main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-backports main restricted universe multiverse
+
+deb http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
+deb-src http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
 EOF
 
 # Bind special filesystems and chroot into the new debootstrap install.
@@ -111,10 +122,10 @@ mount --rbind /dev  /mnt/dev;
 mount --rbind /proc /mnt/proc;
 mount --rbind /sys  /mnt/sys;
 chroot /mnt bash --login;
-rm /etc/mtab;
 ln -s /proc/self/mounts /etc/mtab;
 
 # Update apt package metadata and reconfigure locale and timezone.
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4AB0F789CBA31744CC7DA76A8CF63AD3F06FC659;
 apt update;
 dpkg-reconfigure locales; # aways also select en_US.UTF-8 in addition to any other dialects.
 dpkg-reconfigure tzdata;
@@ -123,13 +134,15 @@ dpkg-reconfigure tzdata;
 echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext4 errors=remount-ro 0 1" >> /etc/fstab;
 echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
 
-apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
+apt install -y grub-efi;
 
 sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
 
 grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
 
-apt install -y linux-image-generic linux-headers-generic linux-tools-generic;
+apt install -y --install-recommends linux-generic-hwe-16.04 xserver-xorg-hwe-16.04 zfs-dkms zfs-initramfs zfsutils-linux;
+
+apt install -y bridge-utils openssh-server ubuntu-server vim;
 
 grub-mkconfig -o /boot/grub/grub.cfg;
 
