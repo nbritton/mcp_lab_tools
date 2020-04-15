@@ -144,7 +144,7 @@ apt install -y --install-recommends linux-generic-hwe-16.04 xserver-xorg-hwe-16.
 
 apt install -y bridge-utils openssh-server ubuntu-server vim;
 
-grub-mkconfig -o /boot/grub/grub.cfg;
+#grub-mkconfig -o /boot/grub/grub.cfg;
 
 addgroup --system lpadmin;
 addgroup --system sambashare;
@@ -172,9 +172,11 @@ echo "root:password" | chpasswd;
 
 ls /boot/grub/*/zfs.mod;
 
+zpool upgrade rpool;
 zfs snapshot rpool/ROOT/ubuntu@install;
 
 exit;
+cd;
 
 mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {};
 
@@ -184,22 +186,23 @@ reboot;
 
 # The system should boot up normally, but chances are you may only get to a grub prompt, do the following if that happens:
 grub> set root=(hd0,gpt2)
-grub> linux /vmlinuz-5.4.0-18-generic root=ZFS=rpool/ROOT/ubuntu
-grub> initrd /boot/initrd.img-5.4.0-18-generic
+grub> linux /vmlinuz-4.15.0-72-generic root=ZFS=rpool/ROOT/ubuntu
+grub> initrd /boot/initrd.img-4.15.0-72-generic
 grub> boot
 
 # Post install / after reboot into new system.
-zfs create rpool/home/YOURUSERNAME;
-adduser YOURUSERNAME;
-cp -a /etc/skel/. /home/YOURUSERNAME;
-chown -R YOURUSERNAME:YOURUSERNAME /home/YOURUSERNAME;
-usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo YOURUSERNAME;
+u=nbritton;
+zfs create rpool/home/$u;
+adduser $u;
+cp -a /etc/skel/. /home/$u;
+chown -R $u:$u /home/$u;
+usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo $u;
 
 # Rerun update-grub and update-iniramfs
 update-grub;
 update-initramfs -u -k all;
 
 ### Install Ubuntu Mate Desktop ###
-apt install -y gir1.2-matedesktop-2.0:amd64 gir1.2-matemenu-2.0:amd64 gir1.2-matepanelapplet-4.0:amd64 libann0 libcolamd2:amd64 libmate-desktop-2-17:amd64 libmatedict6 libmatekbd4:amd64 libmatekbd-common libmate-menu2:amd64 libmatemixer0:amd64 libmatemixer-common libmate-panel-applet-4-1:amd64 libmate-sensors-applet-plugin0 libmate-slab0:amd64 libmateweather1:amd64 libmateweather-common libmate-window-settings1:amd64 mate-accessibility-profiles mate-applet-appmenu mate-applet-brisk-menu mate-applets mate-applets-common mate-calc mate-calc-common mate-control-center mate-control-center-common mate-desktop mate-desktop-common mate-desktop-environment-core mate-dock-applet mate-hud mate-icon-theme mate-indicator-applet mate-indicator-applet-common mate-media mate-media-common mate-menu mate-menus mate-netbook mate-netbook-common mate-notification-daemon mate-notification-daemon-common mate-optimus mate-panel mate-panel-common mate-polkit:amd64 mate-polkit-common mate-power-manager mate-power-manager-common mate-screensaver mate-screensaver-common mate-sensors-applet mate-sensors-applet-common mate-session-manager mate-settings-daemon mate-settings-daemon-common mate-system-monitor mate-system-monitor-common mate-terminal mate-terminal-common mate-themes mate-tweak mate-user-guide mate-utils mate-utils-common mate-window-applets-common mate-window-buttons-applet mate-window-menu-applet mate-window-title-applet plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text ubuntu-mate-artwork ubuntu-mate-core ubuntu-mate-default-settings ubuntu-mate-desktop ubuntu-mate-guide ubuntu-mate-icon-themes ubuntu-mate-themes ubuntu-mate-wallpapers ubuntu-mate-wallpapers-common ubuntu-mate-wallpapers-focal ubuntu-mate-wallpapers-photos;
+apt install -y libann0 libmate-desktop-2-17:amd64 libmatedict6 libmatekbd4:amd64 libmatekbd-common libmate-menu2:amd64 libmatemixer0:amd64 libmatemixer-common libmate-panel-applet-4-1:amd64 libmate-sensors-applet-plugin0 libmate-slab0:amd64 libmateweather1:amd64 libmateweather-common libmate-window-settings1:amd64 mate-accessibility-profiles mate-applets mate-applets-common mate-control-center mate-control-center-common mate-desktop mate-desktop-common mate-desktop-environment-core mate-dock-applet mate-icon-theme mate-indicator-applet mate-indicator-applet-common mate-media mate-media-common mate-menu mate-menus mate-netbook mate-netbook-common mate-notification-daemon mate-notification-daemon-common mate-optimus mate-panel mate-panel-common mate-polkit:amd64 mate-polkit-common mate-power-manager mate-power-manager-common mate-screensaver mate-screensaver-common mate-sensors-applet mate-sensors-applet-common mate-session-manager mate-settings-daemon mate-settings-daemon-common mate-system-monitor mate-system-monitor-common mate-terminal mate-terminal-common mate-themes mate-tweak mate-user-guide mate-utils mate-utils-common plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text ubuntu-mate-artwork ubuntu-mate-core ubuntu-mate-default-settings ubuntu-mate-desktop ubuntu-mate-icon-themes ubuntu-mate-themes ubuntu-mate-wallpapers ubuntu-mate-wallpapers-common;
 
-# The rest of the guide for general setup of a Ubuntu 20.04 Server with RDP enabled Mate Desktop is here: https://github.com/nbritton/mcp_lab_tools/blob/master/ubuntu_mate_2004_server-setup
+# The rest of the guide for general setup of a Ubuntu 16.04 Server with RDP enabled Mate Desktop is here: https://github.com/nbritton/mcp_lab_tools/blob/master/ubuntu_mate_1604_server-setup
