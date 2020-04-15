@@ -40,13 +40,11 @@ adduser xrdp ssl-cert;
 systemctl restart xrdp;
 
 ### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
-wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-1.0.0.0/MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64.tgz;
-tar -axf MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64.tgz;
-cd MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu20.04-x86_64/;
+wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-2.1.8.0/MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
+tar -axf MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
+cd MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64/;
 apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex libnl-3-dev libnl-route-3-dev;
-rmmod rdma_ucm;
-rmmod ib_iser rpcrdma;
-rmmod rdma_cm;
+rmmod rdma_ucm ib_iser rpcrdma rdma_cm;
 ./mlnxofedinstall;
 
 ## Configure Mellanox Card:
