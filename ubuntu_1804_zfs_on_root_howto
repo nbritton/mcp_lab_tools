@@ -159,7 +159,7 @@ chroot /mnt bash --login;
 ln -s /proc/self/mounts /etc/mtab;
 
 # Update apt package metadata and reconfigure locale and timezone.
-apt install -y bash-completion grub-efi software-properties-common vim;
+apt install -y bash-completion software-properties-common vim;
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8CF63AD3F06FC659; # ZFS PPA
 apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 13E01B7B3FE869A9; # Gluster PPA
 apt update;
@@ -170,13 +170,13 @@ dpkg-reconfigure tzdata;
 echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext4 errors=remount-ro 0 1" >> /etc/fstab;
 echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
 
+apt install -y grub-efi; # ignore: "/usr/sbin/grub-probe: error: failed to get canonical path of `rpool/ROOT/ubuntu'." 
+
 sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
 
-grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
+apt install -y --install-recommends linux-generic-hwe-18.04 zfs-dkms zfs-initramfs zfsutils-linux openssh-server ubuntu-server;
 
-apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
-
-apt install -y linux-image-generic linux-headers-generic linux-tools-generic;
+apt upgrade -y;
 
 grub-mkconfig -o /boot/grub/grub.cfg;
 
