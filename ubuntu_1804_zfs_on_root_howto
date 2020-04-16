@@ -15,7 +15,7 @@
 # Open up terminal, run:
 sudo -i;
 apt update;
-apt install -y openssh-server zfsutils-linux debootstrap;
+apt install -y openssh-server zfsutils-linux debootstrap vim;
 echo "ubuntu-mate:password" | chpasswd;
 ip a | grep inet;
 # SSH into the live image from another machine using the ubuntu-mate user id.
@@ -65,7 +65,7 @@ mkdir /mnt/boot/efi;
 mount /dev/sdq1 /mnt/boot/efi;
 
 # Installation takes place using debootstrap.
-debootstrap focal /mnt;
+debootstrap bionic /mnt;
 zfs set devices=off rpool;
 
 # Configure hostname, /etc/hosts, /etc/machine-id.
@@ -89,25 +89,36 @@ network:
     eno2: {mtu: 9000}
     eno3: {mtu: 9000}
     eno4: {mtu: 9000}
-    enp65s0: {mtu: 9000}
-    enp65s0d1: {mtu: 9000}
-    ibp3s0:
-      addresses: [192.168.144.10/24]
 
   bonds:
     bond0:
       mtu: 9000
-      interfaces: [enp65s0, enp65s0d1]
+      interfaces: [eno1, eno2]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
         mii-monitor-interval: 100
         transmit-hash-policy: layer3+4
+  
+      bond1:
+      mtu: 9000
+      interfaces: [eno3, eno4]
+      parameters:
+        mode: balance-alb
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
 
   bridges:
-    internet:
+    br-bond0:
       mtu: 9000
       interfaces: [bond0]
+      dhcp4: yes
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+        
+    br-bond1:
+      mtu: 9000
+      interfaces: [bond1]
       dhcp4: yes
       nameservers:
         addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
@@ -115,17 +126,29 @@ EOF
 
 # Configure apt sources.
 cat << 'EOF' > /mnt/etc/apt/sources.list;
-deb http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
-deb-src http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu bionic main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu bionic main restricted universe multiverse
 
-deb http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
-deb-src http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu bionic-security main restricted universe multiverse
+deb-src http://security.ubuntu.com/ubuntu bionic-security main restricted universe multiverse
 
-deb http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
-deb-src http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu bionic-updates main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu bionic-updates main restricted universe multiverse
 
-deb http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
-deb-src http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu bionic-backports main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu bionic-backports main restricted universe multiverse
+EOF
+
+# ZFS v0.8.3, technically optional but strongly recommended
+cat << 'EOF' > /mnt/etc/apt/sources.list.d/zfs.list;
+deb http://ppa.launchpad.net/jonathonf/zfs/ubuntu bionic main 
+deb-src http://ppa.launchpad.net/jonathonf/zfs/ubuntu bionic main
+EOF
+
+# Glusterfs, optional
+cat << 'EOF' > /mnt/etc/apt/sources.list.d/glusterfs.list;
+deb http://ppa.launchpad.net/gluster/glusterfs-7/ubuntu bionic main
+deb-src http://ppa.launchpad.net/gluster/glusterfs-7/ubuntu bionic main
 EOF
 
 # Bind special filesystems and chroot into the new debootstrap install.
@@ -133,10 +156,12 @@ mount --rbind /dev  /mnt/dev;
 mount --rbind /proc /mnt/proc;
 mount --rbind /sys  /mnt/sys;
 chroot /mnt bash --login;
-rm /etc/mtab;
 ln -s /proc/self/mounts /etc/mtab;
 
 # Update apt package metadata and reconfigure locale and timezone.
+apt install -y bash-completion grub-efi software-properties-common vim;
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8CF63AD3F06FC659; # ZFS PPA
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 13E01B7B3FE869A9; # Gluster PPA
 apt update;
 dpkg-reconfigure locales; # aways also select en_US.UTF-8 in addition to any other dialects.
 dpkg-reconfigure tzdata;
@@ -145,11 +170,11 @@ dpkg-reconfigure tzdata;
 echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext4 errors=remount-ro 0 1" >> /etc/fstab;
 echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
 
-apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
-
 sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
 
 grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
+
+apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
 
 apt install -y linux-image-generic linux-headers-generic linux-tools-generic;
 
