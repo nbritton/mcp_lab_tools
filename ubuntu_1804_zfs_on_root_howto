@@ -100,7 +100,7 @@ network:
         mii-monitor-interval: 100
         transmit-hash-policy: layer3+4
   
-      bond1:
+    bond1:
       mtu: 9000
       interfaces: [eno3, eno4]
       parameters:
