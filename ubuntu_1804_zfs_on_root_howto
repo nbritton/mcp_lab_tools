@@ -174,7 +174,7 @@ apt install -y grub-efi; # ignore: "/usr/sbin/grub-probe: error: failed to get c
 
 sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
 
-apt install -y --install-recommends linux-generic-hwe-18.04 zfs-dkms zfs-initramfs zfsutils-linux openssh-server ubuntu-server;
+apt install -y --install-recommends linux-generic-hwe-18.04 zfs-dkms zfs-initramfs zfsutils-linux openssh-server ubuntu-server bridge-utils;
 
 apt upgrade -y;
 
