@@ -116,8 +116,6 @@ UUID=e046fdc8-b223-4557-9892-dec55b418374 / btrfs noatime,compress=lzo,commit=0,
 
 apt install -y grub-efi;
 
-sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
-
 grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
 
 apt install -y --install-recommends linux-generic-hwe-16.04 zfs-dkms zfs-initramfs zfsutils-linux;
