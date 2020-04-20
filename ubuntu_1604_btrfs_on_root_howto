@@ -127,18 +127,6 @@ apt install -y bridge-utils openssh-server ubuntu-server vim;
 addgroup --system lpadmin;
 addgroup --system sambashare;
 
-zfs set mountpoint=legacy rpool/var/log;
-echo rpool/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab;
-
-zfs set mountpoint=legacy rpool/var/spool;
-echo rpool/var/spool /var/spool zfs nodev,relatime 0 0 >> /etc/fstab;
-
-zfs set mountpoint=legacy rpool/var/tmp;
-echo rpool/var/tmp /var/tmp zfs nodev,relatime 0 0 >> /etc/fstab;
-
-zfs set mountpoint=legacy rpool/tmp;
-echo rpool/tmp /tmp zfs nodev,relatime 0 0 >> /etc/fstab;
-
 sed -i 's/GRUB_TIMEOUT_STYLE=hidden/#GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub;
 sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=10/' /etc/default/grub;
 sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT=""/' /etc/default/grub;
@@ -148,17 +136,10 @@ update-initramfs -u -k all;
 
 echo "root:password" | chpasswd;
 
-ls /boot/grub/*/zfs.mod;
-
-zpool upgrade rpool;
-zfs snapshot rpool/ROOT/ubuntu@install;
-
 exit;
 cd;
 
 mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {};
-
-zpool export -a;
 
 reboot;
 
