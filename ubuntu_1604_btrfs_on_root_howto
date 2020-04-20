@@ -1,1 +1,188 @@
-asdf
+# This is a modified procedure for running ZFS on root on Ubuntu. It mostly follows the standard process, but rather then
+# using a bpool (boot pool) it instead uses an SD card, USB flash, or other 1GB ~ 8GB device for storing the EFI System
+# Partition and /boot on a traditional ext4 filesystem. The bpool felt like too much of a hack for any kind of production
+# environment so I tossed it because most Dell servers have an Internal Dual SD Module that can provide redundant storage
+# for the bootloader and EFI. The Dell vFlash class 10 SD cards are perfect for this task, but vFlash cards meant for
+# iDRAC6 are too slow for this task because they are only class 2 SD cards I recall.
+#
+# Source references:
+# https://github.com/openzfs/zfs/wiki/Ubuntu-18.04-Root-on-ZFS
+# https://askubuntu.com/questions/831216/how-can-i-reinstall-grub-to-the-efi-partition
+# https://www.linux.com/training-tutorials/how-rescue-non-booting-grub-2-linux/
+
+# Boot a Ubuntu Mate desktop live DVD ISO... versions 18.04, 19.04, 19.10, or 20.04 ISO will all work.
+# https://ubuntu-mate.org/download/
+# Open up terminal, run:
+sudo -i;
+apt update;
+apt install -y openssh-server zfsutils-linux debootstrap vim;
+echo "ubuntu-mate:password" | chpasswd;
+ip a | grep inet;
+# SSH into the live image from another machine using the ubuntu-mate user id.
+
+# Wipe disks, for example this will wipe every scsi disk:
+wipefs -af /dev/sd{a..z};
+
+# Partition USB flash / SD Card, gpt1 is fat32 for EFI System Partition and gpt2 is Ext4 for /boot. Change /dev/sdq to your
+# device name. Also change 2048 if you're not using an 8GB device. EFI needs at least 512MB, and /boot needs at least 256MB...
+# but 1024MB or more is recommended. 
+parted --script --align optimal /dev/sde mklabel gpt mkpart primary fat32 0% 2048 name 1 ESP set 1 esp on mkpart primary ext2 2048 100% name 2 boot;
+mkfs.fat -n ESP -F32 /dev/sde1;
+mkfs.ext4 -L boot /dev/sde2;
+
+# Create the btrfs array to your liking, i.g. raid1, raid10, raid5, etc.
+mkfs.btrfs -m raid1 -d raid1 /dev/sdc /dev/sdd;
+
+# mount new btrfs array by UUID
+mount /dev/disk/by-uuid/e046fdc8-b223-4557-9892-dec55b418374 /mnt
+
+# Mount EFI System Partition and /boot into the btrfs directory structure.
+mkdir /mnt/boot;
+mount /dev/sdq2 /mnt/boot;
+mkdir /mnt/boot/efi;
+mount /dev/sdq1 /mnt/boot/efi;
+
+# Installation takes place using debootstrap.
+debootstrap xenial /mnt;
+
+# Configure hostname, /etc/hosts, /etc/machine-id.
+# echo "r820-jq3xl02" > /mnt/etc/hostname;
+# echo "127.0.1.1       r820-jq3xl02.exabit.io r820-jq3xl02" >> /mnt/etc/hosts;
+
+HOSTNAME=$(dmidecode -t 1 | awk '/Product/ {printf tolower($NF"-")}'; dmidecode -t 1 | awk '/Serial/ {print tolower($NF)}');
+echo "$HOSTNAME" > /mnt/etc/hostname;
+echo "127.0.1.1       $HOSTNAME.exabit.io $HOSTNAME" >> /mnt/etc/hosts;
+
+uuidgen | tr -d '-' > /mnt/etc/machine-id;
+
+# Configure networking.
+cat << 'EOF' > /mnt/etc/network/interfaces;
+# interfaces(5) file used by ifup(8) and ifdown(8)
+# Include files from /etc/network/interfaces.d:
+source-directory /etc/network/interfaces.d
+
+auto lo
+iface lo inet loopback
+
+auto eno1
+iface eno1 inet dhcp
+EOF
+
+# Configure apt sources.
+cat << 'EOF' > /mnt/etc/apt/sources.list;
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-security main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-updates main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-backports main restricted universe multiverse
+
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-security main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-updates main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-backports main restricted universe multiverse
+
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-security main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-updates main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-backports main restricted universe multiverse
+
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-security main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-updates main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-backports main restricted universe multiverse
+
+deb http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
+deb-src http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
+EOF
+
+# Bind special filesystems and chroot into the new debootstrap install.
+mount --rbind /dev  /mnt/dev;
+mount --rbind /proc /mnt/proc;
+mount --rbind /sys  /mnt/sys;
+chroot /mnt bash --login;
+ln -s /proc/self/mounts /etc/mtab;
+
+# Update apt package metadata and reconfigure locale and timezone.
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4AB0F789CBA31744CC7DA76A8CF63AD3F06FC659;
+apt update;
+dpkg-reconfigure locales; # aways also select en_US.UTF-8 in addition to any other dialects.
+dpkg-reconfigure tzdata;
+
+# Add /boot and EFI System Partition to /etc/fstab.
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext4 errors=remount-ro 0 1" >> /etc/fstab;
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
+
+# Add btrfs root mount to /etc/fstab:
+UUID=e046fdc8-b223-4557-9892-dec55b418374 / btrfs noatime,compress=lzo,commit=0,ssd_spread,autodefrag 0 0
+
+apt install -y grub-efi;
+
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
+
+grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
+
+apt install -y --install-recommends linux-generic-hwe-16.04 zfs-dkms zfs-initramfs zfsutils-linux;
+
+apt install -y bridge-utils openssh-server ubuntu-server vim;
+
+#grub-mkconfig -o /boot/grub/grub.cfg;
+
+addgroup --system lpadmin;
+addgroup --system sambashare;
+
+zfs set mountpoint=legacy rpool/var/log;
+echo rpool/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/var/spool;
+echo rpool/var/spool /var/spool zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/var/tmp;
+echo rpool/var/tmp /var/tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/tmp;
+echo rpool/tmp /tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+sed -i 's/GRUB_TIMEOUT_STYLE=hidden/#GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub;
+sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=10/' /etc/default/grub;
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT=""/' /etc/default/grub;
+update-grub;
+
+update-initramfs -u -k all;
+
+echo "root:password" | chpasswd;
+
+ls /boot/grub/*/zfs.mod;
+
+zpool upgrade rpool;
+zfs snapshot rpool/ROOT/ubuntu@install;
+
+exit;
+cd;
+
+mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {};
+
+zpool export -a;
+
+reboot;
+
+# The system should boot up normally, but chances are you may only get to a grub prompt, do the following if that happens:
+grub> set root=(hd0,gpt2)
+grub> linux /vmlinuz-4.15.0-72-generic root=ZFS=rpool/ROOT/ubuntu
+grub> initrd /boot/initrd.img-4.15.0-72-generic
+grub> boot
+
+# Post install / after reboot into new system.
+u=nbritton;
+zfs create rpool/home/$u;
+adduser $u;
+cp -a /etc/skel/. /home/$u;
+chown -R $u:$u /home/$u;
+usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo $u;
+
+# Rerun update-grub and update-iniramfs
+update-grub;
+update-initramfs -u -k all;
+
+### Install Ubuntu Mate Desktop ###
+apt install -y libann0 libmate-desktop-2-17:amd64 libmatedict6 libmatekbd4:amd64 libmatekbd-common libmate-menu2:amd64 libmatemixer0:amd64 libmatemixer-common libmate-panel-applet-4-1:amd64 libmate-sensors-applet-plugin0 libmate-slab0:amd64 libmateweather1:amd64 libmateweather-common libmate-window-settings1:amd64 mate-accessibility-profiles mate-applets mate-applets-common mate-control-center mate-control-center-common mate-desktop mate-desktop-common mate-desktop-environment-core mate-dock-applet mate-icon-theme mate-indicator-applet mate-indicator-applet-common mate-media mate-media-common mate-menu mate-menus mate-netbook mate-netbook-common mate-notification-daemon mate-notification-daemon-common mate-optimus mate-panel mate-panel-common mate-polkit:amd64 mate-polkit-common mate-power-manager mate-power-manager-common mate-screensaver mate-screensaver-common mate-sensors-applet mate-sensors-applet-common mate-session-manager mate-settings-daemon mate-settings-daemon-common mate-system-monitor mate-system-monitor-common mate-terminal mate-terminal-common mate-themes mate-tweak mate-user-guide mate-utils mate-utils-common plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text ubuntu-mate-artwork ubuntu-mate-core ubuntu-mate-default-settings ubuntu-mate-desktop ubuntu-mate-icon-themes ubuntu-mate-themes ubuntu-mate-wallpapers ubuntu-mate-wallpapers-common;
+
+# The rest of the guide for general setup of a Ubuntu 16.04 Server with RDP enabled Mate Desktop is here: https://github.com/nbritton/mcp_lab_tools/blob/master/ubuntu_mate_1604_server-setup
