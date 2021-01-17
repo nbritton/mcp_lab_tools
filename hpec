@@ -151,7 +151,9 @@ deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-u
 deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-backports main restricted universe multiverse
 
 deb [arch=amd64] http://mirror.mirantis.com/2019.2.0//saltstack-2017.7//xenial xenial main
+EOF
 
+cat << 'EOF' > /mnt/etc/apt/sources.list.d/zfs.list
 deb http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
 deb-src http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
 EOF
@@ -245,4 +247,98 @@ update-initramfs -u -k all;
 ### Install Ubuntu Mate Desktop ###
 apt install -y libann0 libmate-desktop-2-17:amd64 libmatedict6 libmatekbd4:amd64 libmatekbd-common libmate-menu2:amd64 libmatemixer0:amd64 libmatemixer-common libmate-panel-applet-4-1:amd64 libmate-sensors-applet-plugin0 libmate-slab0:amd64 libmateweather1:amd64 libmateweather-common libmate-window-settings1:amd64 mate-accessibility-profiles mate-applets mate-applets-common mate-control-center mate-control-center-common mate-desktop mate-desktop-common mate-desktop-environment-core mate-dock-applet mate-icon-theme mate-indicator-applet mate-indicator-applet-common mate-media mate-media-common mate-menu mate-menus mate-netbook mate-netbook-common mate-notification-daemon mate-notification-daemon-common mate-optimus mate-panel mate-panel-common mate-polkit:amd64 mate-polkit-common mate-power-manager mate-power-manager-common mate-screensaver mate-screensaver-common mate-sensors-applet mate-sensors-applet-common mate-session-manager mate-settings-daemon mate-settings-daemon-common mate-system-monitor mate-system-monitor-common mate-terminal mate-terminal-common mate-themes mate-tweak mate-user-guide mate-utils mate-utils-common plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text ubuntu-mate-artwork ubuntu-mate-core ubuntu-mate-default-settings ubuntu-mate-desktop ubuntu-mate-icon-themes ubuntu-mate-themes ubuntu-mate-wallpapers ubuntu-mate-wallpapers-common;
 
-# The rest of the guide for general setup of a Ubuntu 16.04 Server with RDP enabled Mate Desktop is here: https://github.com/nbritton/mcp_lab_tools/blob/master/ubuntu_mate_1604_server-setup
+### Install Dell OpenManage:
+echo 'deb http://linux.dell.com/repo/community/openmanage/911/xenial xenial main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
+gpg -a --export 1285491434D8786F | sudo apt-key add -;
+apt update && apt -y install srvadmin-base srvadmin-webserver srvadmin-idracadm7 syscfg raidcfg dcism
+
+### Install Salt Minion:
+apt install -y salt-minion;
+
+cat << EOF > /etc/salt/minion.d/minion.conf;
+master: 10.10.1.15
+id: $(hostname).exabit.io
+acceptance_wait_time: 10
+acceptance_wait_time_max: 60
+auth_timeout: 180
+master_tries: -1
+max_event_size: 100000000
+random_reauth_delay: 270
+recon_default: 1000
+recon_max: 60000
+recon_randomize: True
+
+grains:
+  roles:
+  - fluentd.agent
+  - telegraf.agent
+  - salt.control
+  - salt.minion
+  - rsyslog.client
+  - ntp.client
+  - openssh.server
+  - keepalived.cluster
+  - logrotate.server
+  - auditd.service
+  - glusterfs.server
+  - grafana.collector
+  - linux.storage
+  - linux.system
+  - linux.network
+  - libvirt.server
+  - prometheus.collector
+  - openscap.service
+  services:
+  - fluentd
+  - telegraf
+  - salt
+  - rsyslog
+  - virt
+  - ntp
+  - openssh
+  - keepalived
+  - logrotate
+  - auditd
+  - glusterfs
+  - grafana
+  - _reclass_
+  - linux
+  - libvirt
+  - prometheus
+  - openscap
+
+grains_dirs:
+- /var/lib/salt/grains
+
+mine_functions:
+  network.interfaces: []
+  grains.items: []
+mine_interval: 60
+log_level: info
+
+state_output: changes
+EOF
+
+salt-call saltutil.sync_all;
+salt-call state.apply linux.system.repo;
+
+### Update Ubuntu
+apt update;
+apt upgrade -y;
+
+
+### Enable SR-IOV device passthrough
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="intel_iommu=on iommu=pt /' /etc/default/grub;
+update-grub;
+
+### Setup SR-IOV and hypervisor passthrough on Intel igb devices:
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="pci=assign-busses /' /etc/default/grub;
+update-grub;
+echo -e "options igb max_vfs=7\nblacklist igbvf" > /etc/modprobe.d/igb.conf;
+update-initramfs -u;
+
+
+### Enable KVM virtualization:
+echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
+apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager libvirt-bin spice-client-gtk gir1.2-spice-client-gtk-3.0;
