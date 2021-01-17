@@ -240,12 +240,24 @@ cp -a /etc/skel/. /home/$u;
 chown -R $u:$u /home/$u;
 usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo $u;
 
+### Enable password-less sudo for users in the sudo group:
+sed -i 's/^%sudo.*ALL$/%sudo\tALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers;
+
+### Setup SSH public key for password-less login:
+install -d -o nbritton -g nbritton -m 700 /home/nbritton/.ssh;
+curl -s https://launchpad.net/%7Enbritton/+sshkeys > /home/nbritton/.ssh/id_rsa.pub;
+chown nbritton:nbritton /home/nbritton/.ssh/id_rsa.pub;
+install -o nbritton -g nbritton -m 600 /home/nbritton/.ssh/id_rsa.pub /home/nbritton/.ssh/authorized_keys;
+
 # Rerun update-grub and update-iniramfs
 update-grub;
 update-initramfs -u -k all;
 
 ### Install Ubuntu Mate Desktop ###
 apt install -y libann0 libmate-desktop-2-17:amd64 libmatedict6 libmatekbd4:amd64 libmatekbd-common libmate-menu2:amd64 libmatemixer0:amd64 libmatemixer-common libmate-panel-applet-4-1:amd64 libmate-sensors-applet-plugin0 libmate-slab0:amd64 libmateweather1:amd64 libmateweather-common libmate-window-settings1:amd64 mate-accessibility-profiles mate-applets mate-applets-common mate-control-center mate-control-center-common mate-desktop mate-desktop-common mate-desktop-environment-core mate-dock-applet mate-icon-theme mate-indicator-applet mate-indicator-applet-common mate-media mate-media-common mate-menu mate-menus mate-netbook mate-netbook-common mate-notification-daemon mate-notification-daemon-common mate-optimus mate-panel mate-panel-common mate-polkit:amd64 mate-polkit-common mate-power-manager mate-power-manager-common mate-screensaver mate-screensaver-common mate-sensors-applet mate-sensors-applet-common mate-session-manager mate-settings-daemon mate-settings-daemon-common mate-system-monitor mate-system-monitor-common mate-terminal mate-terminal-common mate-themes mate-tweak mate-user-guide mate-utils mate-utils-common plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text ubuntu-mate-artwork ubuntu-mate-core ubuntu-mate-default-settings ubuntu-mate-desktop ubuntu-mate-icon-themes ubuntu-mate-themes ubuntu-mate-wallpapers ubuntu-mate-wallpapers-common;
+
+systemctl disable graphical.target;
+systemctl set-default multi-user.target;
 
 ### Install Dell OpenManage:
 echo 'deb http://linux.dell.com/repo/community/openmanage/911/xenial xenial main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
@@ -331,6 +343,17 @@ apt upgrade -y;
 apt remove --purge linux-*4.15.0-72*;
 
 reboot;
+
+### Run linux.system salt state:
+salt-call state.apply linux.system;
+
+### Install Mellanox OFED Suite:
+wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-2.1.8.0/MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu16.04-x86_64.tgz;
+tar -axf MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu16.04-x86_64.tgz;
+cd ./MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu16.04-x86_64/;
+rmmod ib_iser;
+rmmod rdma_cm;
+./mlnxofedinstall;
 
 ### Enable SR-IOV device passthrough
 sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="intel_iommu=on iommu=pt /' /etc/default/grub;
