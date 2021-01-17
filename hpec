@@ -327,17 +327,14 @@ salt-call state.apply linux.system.repo;
 apt update;
 apt upgrade -y;
 
+### Remove old kernel(s):
+apt remove --purge linux-*4.15.0-72*;
+
+reboot;
 
 ### Enable SR-IOV device passthrough
 sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="intel_iommu=on iommu=pt /' /etc/default/grub;
 update-grub;
-
-### Setup SR-IOV and hypervisor passthrough on Intel igb devices:
-sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="pci=assign-busses /' /etc/default/grub;
-update-grub;
-echo -e "options igb max_vfs=7\nblacklist igbvf" > /etc/modprobe.d/igb.conf;
-update-initramfs -u;
-
 
 ### Enable KVM virtualization:
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
