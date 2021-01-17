@@ -80,7 +80,10 @@ echo "127.0.1.1       $HOSTNAME.exabit.io $HOSTNAME" >> /mnt/etc/hosts;
 uuidgen | tr -d '-' > /mnt/etc/machine-id;
 
 # Configure networking.
-cat << 'EOF' > /mnt/etc/network/interfaces;
+
+export LAST_OCTET_OF_IP=240;
+
+cat << EOF > /mnt/etc/network/interfaces;
 source /etc/network/interfaces.d/*
 # Workaround for Upstream-Bug: https://github.com/saltstack/salt/issues/40262
 source /etc/network/interfaces.u/*
@@ -100,14 +103,14 @@ iface eno4 inet manual
     bond-master bond0
 auto br-mgm
 iface br-mgm inet static
-    address 10.10.1.240
+    address 10.10.1.${LAST_OCTET_OF_IP}
     netmask 255.255.255.0
     gateway 10.10.1.1
     dns-nameservers 8.8.8.8 1.1.1.1
     bridge_ports bond0
 auto br-ctl
 iface br-ctl inet static
-    address 10.10.10.240
+    address 10.10.10.${LAST_OCTET_OF_IP}
     netmask 255.255.255.0
     bridge_ports bond0.10
 auto bond0
