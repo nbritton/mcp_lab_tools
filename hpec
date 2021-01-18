@@ -364,3 +364,5 @@ echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
 apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager libvirt-bin spice-client-gtk gir1.2-spice-client-gtk-3.0;
 
 salt-call state.apply salt.minion,linux,ntp,openssh,libvirt;
+
+salt -C '* and not kvm*' cmd.run "sed -ie 's/terminal_output gfxterm/terminal_input console\nterminal_output console/' /boot/grub/grub.cfg;";
