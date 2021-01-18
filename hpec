@@ -366,3 +366,6 @@ apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux
 salt-call state.apply salt.minion,linux,ntp,openssh,libvirt;
 
 salt -C '* and not kvm*' cmd.run "sed -ie 's/terminal_output gfxterm/terminal_input console\nterminal_output console/' /boot/grub/grub.cfg;";
+
+salt 'kvm*' cmd.run 'for i in $(virsh list --all --name); do virt-xml ${i} --edit --cpu SandyBridge,clearxml=yes; done';
+salt 'kvm*' cmd.run 'for i in $(virsh list --all --name); do virt-xml ${i} --edit target=vda --disk cache=writethrough,io=threads; done';
