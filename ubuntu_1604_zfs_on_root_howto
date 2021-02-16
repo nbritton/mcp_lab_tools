@@ -114,7 +114,7 @@ deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-
 deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-backports main restricted universe multiverse
 EOF
 
-cat << 'EOF' > /mnt/etc/apt/zfs.list;
+cat << 'EOF' > /mnt/etc/apt/sources.list.d/zfs.list;
 deb http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
 deb-src http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
 EOF
