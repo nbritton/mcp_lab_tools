@@ -103,16 +103,18 @@ deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-security
 deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-updates main restricted universe multiverse
 deb-src [arch=amd64] http://mirror.mirantis.com/2019.2.0/ubuntu/ xenial-backports main restricted universe multiverse
 
-deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial main restricted universe multiverse
-deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-security main restricted universe multiverse
-deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-updates main restricted universe multiverse
-deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-backports main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-security main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-updates main restricted universe multiverse
+deb [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-backports main restricted universe multiverse
 
-deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial main restricted universe multiverse
-deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-security main restricted universe multiverse
-deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-updates main restricted universe multiverse
-deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.8/ubuntu/ xenial-backports main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-security main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-updates main restricted universe multiverse
+deb-src [arch=amd64] http://mirror.mirantis.com/update/2019.2.12/ubuntu/ xenial-backports main restricted universe multiverse
+EOF
 
+cat << 'EOF' > /mnt/etc/apt/zfs.list;
 deb http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
 deb-src http://ppa.launchpad.net/jonathonf/zfs/ubuntu xenial main 
 EOF
