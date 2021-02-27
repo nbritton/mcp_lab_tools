@@ -86,19 +86,13 @@ network:
   renderer: networkd
 
   ethernets:
-    eno1: {mtu: 9000}
-    eno2: {mtu: 9000}
-    eno3: {mtu: 9000}
-    eno4: {mtu: 9000}
-    enp65s0: {mtu: 9000}
-    enp65s0d1: {mtu: 9000}
-    ibp3s0:
-      addresses: [192.168.144.10/24]
+    eno1np0: {mtu: 9000}
+    eno2np0: {mtu: 9000}
 
   bonds:
     bond0:
       mtu: 9000
-      interfaces: [enp65s0, enp65s0d1]
+      interfaces: [eno1np0, eno2np0]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
@@ -106,7 +100,7 @@ network:
         transmit-hash-policy: layer3+4
 
   bridges:
-    internet:
+    lab:
       mtu: 9000
       interfaces: [bond0]
       dhcp4: yes
