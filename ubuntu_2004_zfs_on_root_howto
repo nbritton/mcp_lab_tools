@@ -92,7 +92,7 @@ network:
   bonds:
     bond0:
       mtu: 9000
-      interfaces: [eno1np0, eno2np0]
+      interfaces: [eno1np0, eno2np1]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
