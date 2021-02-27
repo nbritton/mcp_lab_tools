@@ -32,7 +32,7 @@ mkfs.fat -n ESP -F32 /dev/sdq1;
 mkfs.ext4 -L boot /dev/sdq2;
 
 # Create the zpool to your liking, i.g. raidz, raidz2, raidz3, etc.
-zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz /dev/disk/by-path/pci-0000\:42\:00.0-scsi-0\:0\:{0..7}:0;
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz2 /dev/sda /dev/sdi /dev/sdb /dev/sdj /dev/sdc /dev/sdk /dev/sdd /dev/sdl /dev/sde /dev/sdm /dev/sdf /dev/sdn /dev/sdg /dev/sdo /dev/sdh /dev/sdp
 
 zfs create -o canmount=off -o mountpoint=none rpool/ROOT
 zfs create -o canmount=noauto -o mountpoint=/ rpool/ROOT/ubuntu
