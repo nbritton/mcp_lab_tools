@@ -86,13 +86,13 @@ network:
   renderer: networkd
 
   ethernets:
-    eno1np0: {mtu: 9000}
-    eno2np1: {mtu: 9000}
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
 
   bonds:
     bond0:
       mtu: 9000
-      interfaces: [eno1np0, eno2np1]
+      interfaces: [eno1, eno2]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
