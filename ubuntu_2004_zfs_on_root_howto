@@ -176,6 +176,14 @@ echo "root:password" | chpasswd;
 
 ls /boot/grub/*/zfs.mod;
 
+# Add at least one user account.
+u=nbritton;
+zfs create rpool/home/$u;
+adduser $u;
+cp -a /etc/skel/. /home/$u;
+chown -R $u:$u /home/$u;
+usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo $u;
+
 zfs snapshot rpool/ROOT/ubuntu@install;
 
 exit;
