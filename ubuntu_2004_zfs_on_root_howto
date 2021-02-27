@@ -185,10 +185,10 @@ chown -R $u:$u /home/$u;
 usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo $u;
 
 ### Setup SSH public key for password-less login:
-install -d -o nbritton -g nbritton -m 700 /home/nbritton/.ssh;
-curl -s https://githib.com/nbritton.keys > /home/nbritton/.ssh/id_ed25519.pub;
-chown nbritton:nbritton /home/nbritton/.ssh/id_ed25519.pub;
-install -o nbritton -g nbritton -m 600 /home/nbritton/.ssh/id_ed25519.pub /home/nbritton/.ssh/authorized_keys;
+install -d -o $u -g $u -m 700 /home/$u/.ssh;
+curl -s https://github.com/$u.keys > /home/$u/.ssh/id_ed25519.pub;
+chown $u:$u /home/$u/.ssh/id_ed25519.pub;
+install -o $u -g $u -m 600 /home/$u/.ssh/id_ed25519.pub /home/$u/.ssh/authorized_keys;
 
 ### Enable SSH service
 systemctl enable ssh;
