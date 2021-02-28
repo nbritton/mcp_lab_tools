@@ -1113,9 +1113,9 @@ EOF
 virsh define /var/lib/libvirt/images/rtr01.exabit.io/rtr01.exabit.io.xml;
 virsh define /var/lib/libvirt/images/rtr02.exabit.io/rtr02.exabit.io.xml;
 
-cat << 'EOF' > /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
+cat << 'EOF' > /var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
 <domain type='kvm'>
-  <name>cfg01.exabit.io</name>
+  <name>lab01-cfg01.exabit.io</name>
   <uuid>7d05172f-0961-4471-8599-a863fdc44727</uuid>
   <memory unit='KiB'>16777216</memory>
   <currentMemory unit='KiB'>16777216</currentMemory>
@@ -1147,13 +1147,13 @@ cat << 'EOF' > /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
     <emulator>/usr/bin/kvm-spice</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='writethrough' io='threads'/>
-      <source file='/var/lib/libvirt/images/cfg01.exabit.io/system.qcow2'/>
+      <source file='/var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/system.qcow2'/>
       <target dev='vda' bus='virtio'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io-config.iso'/>
+      <source file='/var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/cfg01.exabit.io-config.iso'/>
       <target dev='hda' bus='ide'/>
       <readonly/>
       <address type='drive' controller='0' bus='0' target='0' unit='0'/>
@@ -1205,7 +1205,7 @@ cat << 'EOF' > /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
 </domain>
 EOF
 
-virsh define /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
+virsh define /var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
 
 # Node 1:
 virsh autostart rtr01.exabit.io;
@@ -1214,7 +1214,202 @@ virsh autostart rtr01.exabit.io;
 virsh autostart rtr02.exabit.io;
 
 # Node 3:
-virsh autostart cfg01.exabit.io;
+virsh autostart lab01-cfg01.exabit.io;
+
+wget --directory-prefix=/var/lib/libvirt/images/ http://images-mirantis-com.s3.amazonaws.com/ubuntu-16-04-x64-mcp2019.2.0.qcow2;
+
+cat << 'EOF' > /var/lib/libvirt/images/create-virtual-machines.sh;
+#!/bin/bash
+pre_name_prefix="lab01-"
+post_name_prefix=.exabit.io
+disk_image="./ubuntu-16-04-x64-mcp2019.2.0.qcow2"
+deployment_network=mgmt
+primary_network=control
+deployment_subnet="10.10.1"
+deployment_gateway="10.10.1.1"
+deployment_netmask="255.255.255.0"
+deployment_nameserver="8.8.8.8 1.1.1.1"
+nic_interface_name=ens2
+salt_master_address="10.10.1.15"
+
+declare -Ax ip_addresses
+ip_addresses=(
+  [kvm01]="240"
+  [kvm02]="241"
+  [kvm03]="242"
+  [gtw01]="224"
+  [gtw02]="225"
+  [gtw03]="226"
+  [upg01]="19"
+)
+
+declare -ax machines
+machines=(
+  "kvm"
+  "gtw"
+  "upg"
+)
+
+declare -Ax kvm
+kvm=(
+  [node_count]=3
+  [disk_size]=3000
+  [ram]=163840
+  [cpus]=20
+)
+
+declare -Ax gtw
+gtw=(
+  [node_count]=3
+  [disk_size]=30
+  [ram]=2048
+  [cpus]=4
+)
+
+declare -Ax upg
+upg=(
+  [node_count]=1
+  [disk_size]=300
+  [ram]=16384
+  [cpus]=12
+)
+
+if ! [ $UID = "0" ]; then
+  echo "You must be root to run this command."
+  exit 1
+fi
+
+dataset_name=$(echo ${pre_name_prefix} | tr -d '-')
+test -d /var/lib/libvirt/images/${dataset_name} || {
+  mkdir /var/lib/libvirt/images/${dataset_name};
+}
+
+if ! lsmod | grep -q nbd; then
+  modprobe nbd max_part=8
+fi
+
+for i in "${machines[@]}"; do
+  count=$i[node_count]
+  for j in $(seq ${!count}); do
+    ram=$i[ram]
+    cpus=$i[cpus]
+    disk_size=$i[disk_size]
+    case $i in
+    cmp)
+      short_name=${i}00${j}
+      long_name=${pre_name_prefix}${short_name}${post_name_prefix}
+      ;;
+    osd)
+      short_name=${i}00${j}
+      long_name=${pre_name_prefix}${short_name}${post_name_prefix}
+      ;;
+    *)
+      short_name=${i}0${j}
+      long_name=${pre_name_prefix}${short_name}${post_name_prefix}
+      ;;
+    esac
+    mkdir /var/lib/libvirt/images/${dataset_name}/${long_name}
+    cp -p ${disk_image} /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2
+    chown libvirt-qemu:kvm /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2
+    qemu-img resize /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2 ${!disk_size}G
+    guestmount -a /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2 -m /dev/vg0/root /mnt
+    deployment_address=${deployment_subnet}.${ip_addresses[$short_name]}
+    cat <<EOF >/mnt/etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+auto ${nic_interface_name}
+iface ${nic_interface_name} inet static
+    address ${deployment_address}
+    netmask ${deployment_netmask}
+    gateway ${deployment_gateway}
+    dns-nameservers ${deployment_nameserver}
+EOF
+    echo "network: {config: disabled}" >/mnt/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    echo "master: ${salt_master_address}" >>/mnt/etc/salt/minion.d/minion.conf
+    echo "id: ${short_name}${post_name_prefix}" >>/mnt/etc/salt/minion.d/minion.conf
+    echo "root:password" | chpasswd -R /mnt
+    guestunmount /mnt
+    virt-install \
+      --name ${long_name} \
+      --memory ${!ram} \
+      --vcpus ${!cpus} \
+      --cpu host \
+      --controller usb,model=none \
+      --graphics none \
+      --sound none \
+      --network bridge=${deployment_network} \
+      --network bridge=${primary_network} \
+      --network bridge=${primary_network} \
+      --disk /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2 \
+      --noautoconsole \
+      --boot hd \
+      --os-variant ubuntu16.04 \
+      --autostart
+    case $i in
+    osd)
+      osd_count=$i[osd_count]
+      osd_size=$i[osd_size]
+      for k in $(seq ${!osd_count}); do
+        qemu-img create -f qcow2 /var/lib/libvirt/images/${dataset_name}/${long_name}/osd${k}.qcow2 ${!osd_size}G
+        chown libvirt-qemu:kvm /var/lib/libvirt/images/${dataset_name}/${long_name}/osd${k}.qcow2
+        virsh attach-disk \
+          ${long_name} \
+          --source /var/lib/libvirt/images/${dataset_name}/${long_name}/osd${k}.qcow2 \
+          --persistent \
+          --targetbus virtio \
+          --subdriver qcow2 \
+          --target vd$(echo ${k} | tr 123456789 bcdefghij)
+      done
+      ;;
+    *)
+      ;;
+    esac
+  done
+done
+
+for vm in $(virsh list --all --name | grep ${dataset_name}); do
+  virsh dumpxml ${vm} > /var/lib/libvirt/images/${dataset_name}/${vm}/${vm}.xml;
+done
+EOF
+
+### Node 1
+virsh shutdown lab01-kvm02.exabit.io
+virsh shutdown lab01-kvm03.exabit.io
+virsh shutdown lab01-gtw02.exabit.io
+virsh shutdown lab01-gtw03.exabit.io
+virsh autostart lab01-kvm01.exabit.io
+virsh autostart lab01-gtw01.exabit.io
+virsh autostart lab01-upg01.exabit.io
+virsh console lab01-kvm01.exabit.io
+### kvm01 console:
+salt-call saltutil.sync_all
+salt-call state.apply linux.system.repo
+salt-call state.apply salt.minion
+
+### Node 2
+for vm in $(ls /var/lib/libvirt/images/lab01); do virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml; done
+virsh start lab01-kvm02.exabit.io
+virsh start lab01-gtw02.exabit.io
+virsh autostart lab01-kvm02.exabit.io
+virsh autostart lab01-gtw02.exabit.io
+virsh console lab01-kvm02.exabit.io
+### kvm02 console:
+salt-call saltutil.sync_all
+salt-call state.apply linux.system.repo
+salt-call state.apply salt.minion
+
+### Node 3
+for vm in $(ls /var/lib/libvirt/images/lab01); do virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml; done
+virsh start lab01-kvm03.exabit.io
+virsh start lab01-gtw03.exabit.io
+virsh autostart lab01-kvm03.exabit.io
+virsh autostart lab01-gtw03.exabit.io
+virsh console lab01-kvm03.exabit.io
+### kvm03 console:
+salt-call saltutil.sync_all
+salt-call state.apply linux.system.repo
+salt-call state.apply salt.minion
 
 
 
