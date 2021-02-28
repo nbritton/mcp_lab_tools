@@ -1378,42 +1378,45 @@ done
 EOF
 
 ### Node 1
-virsh shutdown lab01-kvm02.exabit.io
-virsh shutdown lab01-kvm03.exabit.io
-virsh shutdown lab01-gtw02.exabit.io
-virsh shutdown lab01-gtw03.exabit.io
-virsh autostart lab01-kvm01.exabit.io
-virsh autostart lab01-gtw01.exabit.io
-virsh autostart lab01-upg01.exabit.io
-virsh console lab01-kvm01.exabit.io
+for vm in lab01-{kvm,gtw}0{2,3}; do
+  virsh shutdown ${vm};
+  virsh undefine ${vm};
+done
+mv /var/lib/libvirt/images/lab01/lab01-{kvm,gtw}0{2,3}.exabit.io /var/lib/libvirt/images/san/lab01/;
+virsh autostart lab01-kvm01.exabit.io;
+virsh autostart lab01-gtw01.exabit.io;
+virsh console lab01-kvm01.exabit.io;
 ### kvm01 console:
-salt-call saltutil.sync_all
-salt-call state.apply linux.system.repo
-salt-call state.apply salt.minion
+salt-call saltutil.sync_all;
+salt-call state.apply linux.system.repo;
+salt-call state.apply salt.minion;
 
 ### Node 2
-for vm in $(ls /var/lib/libvirt/images/lab01); do virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml; done
-virsh start lab01-kvm02.exabit.io
-virsh start lab01-gtw02.exabit.io
-virsh autostart lab01-kvm02.exabit.io
-virsh autostart lab01-gtw02.exabit.io
+mv /var/lib/libvirt/images/san/lab01/lab01-{kvm,gtw}02.exabit.io /var/lib/libvirt/images/lab01/;
+for vm in $(ls /var/lib/libvirt/images/lab01); do
+  virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml;
+  virsh start ${vm};
+  virsh autostart ${vm};
+done
 virsh console lab01-kvm02.exabit.io
 ### kvm02 console:
-salt-call saltutil.sync_all
-salt-call state.apply linux.system.repo
-salt-call state.apply salt.minion
+salt-call saltutil.sync_all;
+salt-call state.apply linux.system.repo;
+salt-call state.apply salt.minion;
 
 ### Node 3
-for vm in $(ls /var/lib/libvirt/images/lab01); do virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml; done
-virsh start lab01-kvm03.exabit.io
-virsh start lab01-gtw03.exabit.io
-virsh autostart lab01-kvm03.exabit.io
-virsh autostart lab01-gtw03.exabit.io
-virsh console lab01-kvm03.exabit.io
+mv /var/lib/libvirt/images/san/lab01/lab01-{kvm,gtw}02.exabit.io /var/lib/libvirt/images/lab01/;
+mv /var/lib/libvirt/images/san/lab01/lab01-upg01.exabit.io /var/lib/libvirt/images/lab01/;
+for vm in $(ls /var/lib/libvirt/images/lab01); do
+  virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml;
+  virsh start ${vm};
+  virsh autostart ${vm};
+done
+virsh console lab01-kvm03.exabit.io;
 ### kvm03 console:
-salt-call saltutil.sync_all
-salt-call state.apply linux.system.repo
-salt-call state.apply salt.minion
+salt-call saltutil.sync_all;
+salt-call state.apply linux.system.repo;
+salt-call state.apply salt.minion;
 
 ### Run from cfg01 node:
 salt 'kvm*' state.apply linux.system;
