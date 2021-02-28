@@ -356,3 +356,5 @@ netplan apply;
 
 ### Install GlusterFS ###
 apt install -y glusterfs-client glusterfs-common glusterfs-server;
+
+reboot;
