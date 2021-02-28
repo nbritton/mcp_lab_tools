@@ -347,13 +347,20 @@ network:
 
   bridges:
 
-    control:
+    mgmt:
       mtu: 9000
       interfaces: [bond0]
-      dhcp4: yes
+      addresses:
+        - 10.10.1.7/24
+      gateway4: 10.10.1.1
       nameservers:
         addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
 
+    control:
+      interfaces: [bond0-vlan10]
+      addresses:
+        - 10.10.10.7/24
+        
     internet:
       interfaces: [enp66s0f0]
       dhcp4: yes
@@ -369,9 +376,18 @@ network:
 
     gluster:
       mtu: 9000
-      interfaces: [bond2]
+      interfaces: [bond2-vlan144]
       addresses:
-        - 192.168.144.1/24
+        - 192.168.144.7/24
+        
+  vlans:
+    bond0-vlan10:
+      id: 10
+      link: bond0
+      
+    bond2-vlan144:
+      id: 144
+      link: bond2
 EOF
 netplan apply;
 
