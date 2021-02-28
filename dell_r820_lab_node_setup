@@ -298,7 +298,7 @@ apt remove -y --purge network-manager;
 for i in $(seq 4); do printf "[NetDev]\nName=dummy${i}\nKind=dummy\n" > /etc/systemd/network/dummy${i}.netdev; done
 systemctl restart systemd-networkd.service;
 
-### Netplan configuration ###
+### Netplan configuration - Node 1 ###
 test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
 cat << 'EOF' > /etc/netplan/01-netcfg.yaml;
 network:
@@ -395,6 +395,200 @@ network:
 EOF
 netplan apply;
 
+### Netplan configuration - Node 2 ###
+test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    enp2s0: {mtu: 9000}
+    enp4s0: {mtu: 9000}
+    enp66s0f0: {}
+    enp66s0f1: {}
+    enp67s0: {mtu: 9000}
+    enp67s0d1: {mtu: 9000}
+    dummy1: {mtu: 9000}
+    dummy2: {mtu: 9000}
+    dummy3: {mtu: 9000}
+    dummy4: {mtu: 9000}
+
+  bonds:
+
+    bond0:
+      mtu: 9000
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+    bond1:
+      mtu: 9000
+      interfaces: [enp2s0, enp4s0]
+      parameters:
+        mode: balance-tlb
+        primary: enp2s0
+        mii-monitor-interval: 100
+        transmit-hash-policy: encap3+4
+
+    bond2:
+      mtu: 9000
+      interfaces: [enp67s0, enp67s0d1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+  bridges:
+
+    mgmt:
+      mtu: 9000
+      interfaces: [bond0]
+      addresses:
+        - 10.10.1.8/24
+      gateway4: 10.10.1.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+
+    control:
+      interfaces: [bond0-vlan10]
+      addresses:
+        - 10.10.10.8/24
+        
+    internet:
+      interfaces: [enp66s0f0]
+      dhcp4: yes
+
+    ipmi:
+      interfaces: [enp66s0f1]
+      dhcp4: yes
+
+    provider:
+      mtu: 9000
+      interfaces: [bond1]
+      dhcp4: yes
+
+    gluster:
+      mtu: 9000
+      interfaces: [bond2-vlan100]
+      addresses:
+        - 10.10.100.8/24
+        
+  vlans:
+    bond0-vlan10:
+      id: 10
+      link: bond0
+      
+    bond2-vlan100:
+      id: 100
+      link: bond2
+EOF
+netplan apply;
+
+### Netplan configuration - Node 3 ###
+test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    enp2s0: {mtu: 9000}
+    enp4s0: {mtu: 9000}
+    enp66s0f0: {}
+    enp66s0f1: {}
+    enp67s0: {mtu: 9000}
+    enp67s0d1: {mtu: 9000}
+    dummy1: {mtu: 9000}
+    dummy2: {mtu: 9000}
+    dummy3: {mtu: 9000}
+    dummy4: {mtu: 9000}
+
+  bonds:
+
+    bond0:
+      mtu: 9000
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+    bond1:
+      mtu: 9000
+      interfaces: [enp2s0, enp4s0]
+      parameters:
+        mode: balance-tlb
+        primary: enp2s0
+        mii-monitor-interval: 100
+        transmit-hash-policy: encap3+4
+
+    bond2:
+      mtu: 9000
+      interfaces: [enp67s0, enp67s0d1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+  bridges:
+
+    mgmt:
+      mtu: 9000
+      interfaces: [bond0]
+      addresses:
+        - 10.10.1.9/24
+      gateway4: 10.10.1.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+
+    control:
+      interfaces: [bond0-vlan10]
+      addresses:
+        - 10.10.10.9/24
+        
+    internet:
+      interfaces: [enp66s0f0]
+      dhcp4: yes
+
+    ipmi:
+      interfaces: [enp66s0f1]
+      dhcp4: yes
+
+    provider:
+      mtu: 9000
+      interfaces: [bond1]
+      dhcp4: yes
+
+    gluster:
+      mtu: 9000
+      interfaces: [bond2-vlan100]
+      addresses:
+        - 10.10.100.9/24
+        
+  vlans:
+    bond0-vlan10:
+      id: 10
+      link: bond0
+      
+    bond2-vlan100:
+      id: 100
+      link: bond2
+EOF
+netplan apply;
+
 apt update && apt upgrade -y;
 
 reboot;
@@ -410,12 +604,49 @@ gluster peer probe 10.10.100.9
 gluster volume create images disperse 3 redundancy 1 10.10.100.7:/srv/glusterfs/brick1/images 10.10.100.8:/srv/glusterfs/brick1/images 10.10.100.9:/srv/glusterfs/brick1/images;
 gluster volume start images;
 
+### Keepalived Config - Node 1 ###
 cat << 'EOF' > /etc/keepalived/keepalived.conf;
 vrrp_instance gluster {
     state MASTER
     interface gluster
     virtual_router_id 100
     priority 101
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 31459
+    }
+    virtual_ipaddress {
+        10.10.100.100
+    }
+}
+EOF
+
+### Keepalived Config - Node 2 ###
+cat << 'EOF' > /etc/keepalived/keepalived.conf;
+vrrp_instance gluster {
+    state MASTER
+    interface gluster
+    virtual_router_id 100
+    priority 102
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 31459
+    }
+    virtual_ipaddress {
+        10.10.100.100
+    }
+}
+EOF
+
+### Keepalived Config - Node 3 ###
+cat << 'EOF' > /etc/keepalived/keepalived.conf;
+vrrp_instance gluster {
+    state MASTER
+    interface gluster
+    virtual_router_id 100
+    priority 103
     advert_int 1
     authentication {
         auth_type PASS
