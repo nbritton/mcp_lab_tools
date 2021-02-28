@@ -958,5 +958,7 @@ cat << 'EOF' > /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
 </domain>
 EOF
 
+virsh define /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
+
 
 
