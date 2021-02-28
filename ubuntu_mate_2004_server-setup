@@ -66,7 +66,7 @@ apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux
 apt -y install bash-completion bash-doc bc build-essential chromium-browser command-not-found cpufrequtils fio htop httpie iftop iotop iozone3 iperf3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep powertop smartmontools socat speedtest-cli stress-ng sysstat vim zfsutils-linux;
 
 ### Install Dell OpenManage:
-echo 'deb http://linux.dell.com/repo/community/openmanage/940/bionic bionic main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+echo 'deb http://linux.dell.com/repo/community/openmanage/950/focal focal main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
 gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
 gpg -a --export 1285491434D8786F | sudo apt-key add -;
 apt update && apt -y install srvadmin-all syscfg raidcfg dcism;
