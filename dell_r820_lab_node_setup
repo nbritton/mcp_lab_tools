@@ -1,0 +1,358 @@
+# This is a modified procedure for running ZFS on root on Ubuntu. It mostly follows the standard process, but rather then
+# using a bpool (boot pool) it instead uses an SD card, USB flash, or other 1GB ~ 8GB device for storing the EFI System
+# Partition and /boot on a traditional ext4 filesystem. The bpool felt like too much of a hack for any kind of production
+# environment so I tossed it because most Dell servers have an Internal Dual SD Module that can provide redundant storage
+# for the bootloader and EFI. The Dell vFlash class 10 SD cards are good for this task, but vFlash cards meant for
+# iDRAC6 are too slow for this task because they are only class 2 SD cards I recall. The IDSDM is redundant, however, it is
+# very slow, so if redundancy is not important the Internal USB slot is faster. You can setup a cron job to backup /boot.
+#
+# Source references:
+# https://github.com/openzfs/zfs/wiki/Ubuntu-18.04-Root-on-ZFS
+# https://askubuntu.com/questions/831216/how-can-i-reinstall-grub-to-the-efi-partition
+# https://www.linux.com/training-tutorials/how-rescue-non-booting-grub-2-linux/
+
+# Boot a Ubuntu Mate Desktop 20.04 live DVD ISO.
+# https://ubuntu-mate.org/download/
+# Open up terminal, run:
+sudo -i;
+apt update;
+apt install -y openssh-server zfsutils-linux debootstrap vim;
+echo "ubuntu-mate:password" | chpasswd;
+ip a | grep inet;
+# SSH into the live image from another machine using the ubuntu-mate user id.
+
+# Wipe disks:
+wipefs -af /dev/sd{a..q};
+
+# Partition USB flash / SD Card, gpt1 is fat32 for EFI System Partition and gpt2 is Ext4 for /boot. Change /dev/sdq to your
+# device name. Also change 2048 if you're not using an 8GB device. EFI needs at least 512MB, and /boot needs at least 256MB...
+# but 1024MB or more is recommended. 
+parted --script --align optimal /dev/sdq mklabel gpt mkpart primary fat32 0% 2048 name 1 ESP set 1 esp on mkpart primary ext2 2048 100% name 2 boot;
+mkfs.fat -n ESP -F32 /dev/sdq1;
+mkfs.ext4 -L boot /dev/sdq2;
+
+# Create the zpool to your liking, i.g. raidz, raidz2, raidz3, etc.
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz2 /dev/sda /dev/sdi /dev/sdb /dev/sdj /dev/sdc /dev/sdk /dev/sdd /dev/sdl /dev/sde /dev/sdm /dev/sdf /dev/sdn /dev/sdg /dev/sdo /dev/sdh /dev/sdp
+
+zfs create -o canmount=off -o mountpoint=none rpool/ROOT
+zfs create -o canmount=noauto -o mountpoint=/ rpool/ROOT/ubuntu
+zfs mount rpool/ROOT/ubuntu
+zfs create                                 rpool/home
+zfs create -o mountpoint=/root             rpool/home/root
+zfs create -o canmount=off                 rpool/var
+zfs create -o canmount=off                 rpool/var/lib
+zfs create                                 rpool/var/log
+zfs create                                 rpool/var/spool
+zfs create -o com.sun:auto-snapshot=false  rpool/var/cache
+zfs create -o com.sun:auto-snapshot=false  rpool/var/tmp
+chmod 1777 /mnt/var/tmp
+zfs create                                 rpool/opt
+zfs create                                 rpool/srv
+zfs create -o canmount=off                 rpool/usr
+zfs create                                 rpool/usr/local
+zfs create                                 rpool/var/mail
+zfs create                                 rpool/var/snap
+zfs create                                 rpool/var/www
+zfs create                                 rpool/var/lib/AccountsService
+zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/docker
+zfs create -o com.sun:auto-snapshot=false  rpool/var/lib/nfs
+zfs create -o com.sun:auto-snapshot=false  rpool/tmp
+chmod 1777 /mnt/tmp
+
+# Mount EFI System Partition and /boot into the ZFS directory structure.
+mkdir /mnt/boot;
+mount /dev/sdq2 /mnt/boot;
+mkdir /mnt/boot/efi;
+mount /dev/sdq1 /mnt/boot/efi;
+
+# Installation takes place using debootstrap.
+debootstrap focal /mnt;
+zfs set devices=off rpool;
+
+# Configure hostname, /etc/hosts, /etc/machine-id.
+# echo "r820-jq3xl02" > /mnt/etc/hostname;
+# echo "127.0.1.1       r820-jq3xl02.exabit.io r820-jq3xl02" >> /mnt/etc/hosts;
+
+HOSTNAME=$(dmidecode -t 1 | awk '/Product/ {printf tolower($NF"-")}'; dmidecode -t 1 | awk '/Serial/ {print tolower($NF)}');
+echo "$HOSTNAME" > /mnt/etc/hostname;
+echo "127.0.1.1       $HOSTNAME.exabit.io $HOSTNAME" >> /mnt/etc/hosts;
+
+uuidgen | tr -d '-' > /mnt/etc/machine-id;
+
+# Configure networking.
+cat << 'EOF' > /mnt/etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+
+  bonds:
+    bond0:
+      mtu: 9000
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+  bridges:
+    lab:
+      mtu: 9000
+      interfaces: [bond0]
+      dhcp4: yes
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+EOF
+
+# Configure apt sources.
+cat << 'EOF' > /mnt/etc/apt/sources.list;
+deb http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+
+deb http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+deb-src http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+
+deb http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+
+deb http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+EOF
+
+# Bind special filesystems and chroot into the new debootstrap install.
+mount --rbind /dev  /mnt/dev;
+mount --rbind /proc /mnt/proc;
+mount --rbind /sys  /mnt/sys;
+chroot /mnt bash --login;
+rm /etc/mtab;
+ln -s /proc/self/mounts /etc/mtab;
+
+# Update apt package metadata and reconfigure locale and timezone.
+apt update;
+dpkg-reconfigure locales; # aways also select en_US.UTF-8 in addition to any other dialects.
+dpkg-reconfigure tzdata;
+
+# Add /boot and EFI System Partition to /etc/fstab.
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext4 errors=remount-ro 0 1" >> /etc/fstab;
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
+
+apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
+
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=rpool\/ROOT\/ubuntu/' /etc/default/grub;
+
+grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
+
+apt install -y linux-image-generic linux-headers-generic linux-tools-generic;
+
+grub-mkconfig -o /boot/grub/grub.cfg;
+
+addgroup --system lpadmin;
+addgroup --system sambashare;
+
+zfs set mountpoint=legacy rpool/var/log;
+echo rpool/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/var/spool;
+echo rpool/var/spool /var/spool zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/var/tmp;
+echo rpool/var/tmp /var/tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy rpool/tmp;
+echo rpool/tmp /tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+sed -i 's/GRUB_TIMEOUT_STYLE=hidden/#GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub;
+sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=10/' /etc/default/grub;
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT=""/' /etc/default/grub;
+update-grub;
+
+update-initramfs -u -k all;
+
+echo "root:password" | chpasswd;
+
+ls /boot/grub/*/zfs.mod;
+
+# Add at least one user account.
+u=nbritton;
+zfs create rpool/home/$u;
+adduser $u;
+cp -a /etc/skel/. /home/$u;
+chown -R $u:$u /home/$u;
+usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo $u;
+
+### Setup SSH public key for password-less login:
+install -d -o $u -g $u -m 700 /home/$u/.ssh;
+curl -s https://github.com/$u.keys > /home/$u/.ssh/id_ed25519.pub;
+chown $u:$u /home/$u/.ssh/id_ed25519.pub;
+install -o $u -g $u -m 600 /home/$u/.ssh/id_ed25519.pub /home/$u/.ssh/authorized_keys;
+
+### Enable SSH service
+systemctl enable ssh;
+
+### Enable password-less sudo for users in the sudo group:
+sed -i 's/^%sudo.*ALL$/%sudo\tALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers;
+
+zfs snapshot rpool/ROOT/ubuntu@install;
+
+exit;
+
+mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {};
+
+zpool export -a;
+
+reboot;
+
+# The system should boot up normally, but chances are you may only get to a grub prompt, do the following if that happens:
+grub> set root=(hd0,gpt2)
+grub> linux /vmlinuz-5.4.0-66-generic root=ZFS=rpool/ROOT/ubuntu
+grub> initrd /boot/initrd.img-5.4.0-66-generic
+grub> boot
+
+# Rerun update-grub and update-iniramfs
+update-grub;
+update-initramfs -u -k all;
+
+### Install Ubuntu Mate Desktop ###
+apt install -y gir1.2-matedesktop-2.0:amd64 gir1.2-matemenu-2.0:amd64 gir1.2-matepanelapplet-4.0:amd64 libann0 libcolamd2:amd64 libmate-desktop-2-17:amd64 libmatedict6 libmatekbd4:amd64 libmatekbd-common libmate-menu2:amd64 libmatemixer0:amd64 libmatemixer-common libmate-panel-applet-4-1:amd64 libmate-sensors-applet-plugin0 libmate-slab0:amd64 libmateweather1:amd64 libmateweather-common libmate-window-settings1:amd64 mate-accessibility-profiles mate-applet-appmenu mate-applet-brisk-menu mate-applets mate-applets-common mate-calc mate-calc-common mate-control-center mate-control-center-common mate-desktop mate-desktop-common mate-desktop-environment-core mate-dock-applet mate-hud mate-icon-theme mate-indicator-applet mate-indicator-applet-common mate-media mate-media-common mate-menu mate-menus mate-netbook mate-netbook-common mate-notification-daemon mate-notification-daemon-common mate-optimus mate-panel mate-panel-common mate-polkit:amd64 mate-polkit-common mate-power-manager mate-power-manager-common mate-screensaver mate-screensaver-common mate-sensors-applet mate-sensors-applet-common mate-session-manager mate-settings-daemon mate-settings-daemon-common mate-system-monitor mate-system-monitor-common mate-terminal mate-terminal-common mate-themes mate-tweak mate-user-guide mate-utils mate-utils-common mate-window-applets-common mate-window-buttons-applet mate-window-menu-applet mate-window-title-applet plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text ubuntu-mate-artwork ubuntu-mate-core ubuntu-mate-default-settings ubuntu-mate-desktop ubuntu-mate-guide ubuntu-mate-icon-themes ubuntu-mate-themes ubuntu-mate-wallpapers ubuntu-mate-wallpapers-common ubuntu-mate-wallpapers-focal ubuntu-mate-wallpapers-photos;
+
+### Post Install Steps:
+
+## Get updates.
+apt update && apt -y upgrade;
+
+## Setup openssh-server
+apt -y install ubuntu-server xrdp dkms;
+
+### Setup SSH client:
+sed -i 's/^#   StrictHostKeyChecking ask/    StrictHostKeyChecking accept-new/' /etc/ssh/ssh_config;
+sed -i 's/^#   Ciphers .*/    Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com/' /etc/ssh/ssh_config;
+
+### Disable password based remote SSH login:
+sed -i 's/^#PasswordAuthentication yes$/PasswordAuthentication no/' /etc/ssh/sshd_config;
+sed -i 's/^UsePAM yes$/#UsePAM yes/' /etc/ssh/sshd_config;
+
+## Disable splash screen, quiet boot, CPU mitigations (i.g. meltdown, spectre), and IPv6.
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=""/GRUB_CMDLINE_LINUX_DEFAULT="intremap=no_x2apic_optout ipv6.disable=1 mitigations=off"/' /etc/default/grub;
+update-grub;
+
+## Disable GUI on the system console:
+systemctl disable graphical.target;
+systemctl set-default multi-user.target;
+
+## Configure xrdp for remote GUI access with MATE:
+adduser xrdp ssl-cert;
+systemctl restart xrdp;
+
+### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
+# Installing this will reset the NIC, so if your primary NIC is a Mellanox then don't run this remotely.
+wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-2.1.8.0/MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
+tar -axf MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
+cd MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64/;
+apt -y install rdma-core tcl automake dpatch m4 swig chrpath autotools-dev bison libltdl-dev graphviz autoconf debhelper gfortran tk libgfortran4 quilt flex libnl-3-dev libnl-route-3-dev;
+rmmod rdma_ucm ib_iser rpcrdma rdma_cm;
+./mlnxofedinstall;
+
+## Configure Mellanox Card:
+mst start;
+mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4117_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
+mlxconfig -d /dev/mst/mt4117_pciconf0.1 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
+
+### Enable KVM virtualization:
+echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
+apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager;
+
+### Install various utilities and essential packages:
+apt -y install bash-completion bash-doc bc build-essential chromium-browser command-not-found cpufrequtils fio htop httpie iftop iotop iozone3 iperf3 iputils-tracepath jq libgpgme11 libssh2-1 lldpad lm-sensors lsscsi mtr nano netdiscover net-tools ngrep nmap pcregrep powertop smartmontools socat speedtest-cli stress-ng sysstat vim zfsutils-linux;
+
+### Install Dell OpenManage:
+echo 'deb http://linux.dell.com/repo/community/openmanage/950/focal focal main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+echo 'deb http://linux.dell.com/repo/community/openmanage/iSM/360/focal focal main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
+gpg -a --export 1285491434D8786F | sudo apt-key add -;
+apt update && apt -y install srvadmin-all syscfg dcism-osc;
+apt -y install dcism;
+
+### Disable UFW - Firewall ###
+systemctl disable ufw;
+systemctl stop ufw;
+ufw disable;
+apt remove -y --purge ufw;
+
+### Remove network manager, as we use networkd and netplan instead ###
+apt remove -y --purge network-manager;
+
+### Setup Network Dummy Interface ###
+for i in $(seq 4); do printf "[NetDev]\nName=dummy${i}\nKind=dummy\n" > /etc/systemd/network/dummy${i}.netdev; done
+systemctl restart systemd-networkd.service;
+
+### Netplan configuration ###
+test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+  
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    enp2s0: {}
+    enp2s0d1: {}
+    enp66s0f0: {mtu: 9000}
+    enp66s0f1: {mtu: 9000}
+    dummy1: {mtu: 9000}
+    dummy2: {mtu: 9000}
+    dummy3: {mtu: 9000}
+    dummy4: {mtu: 9000}
+
+  bonds:
+  
+    bond0:
+      mtu: 9000
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+        
+    bond1:
+      mtu: 9000
+      interfaces: [enp66s0f0, enp66s0f1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+        
+  bridges:
+  
+    control:
+      mtu: 9000
+      interfaces: [bond0]
+      dhcp4: yes
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+        
+    internet:
+      interfaces: [enp2s0]
+      dhcp4: yes
+
+    ipmi:
+      interfaces: [enp2s0d1]
+      dhcp4: yes 
+      
+    provider:
+      mtu: 9000
+      interfaces: [bond1]
+      dhcp4: yes   
+EOF
+netplan apply;
+
+### Install GlusterFS ###
+apt install -y glusterfs-client glusterfs-common glusterfs-server;
