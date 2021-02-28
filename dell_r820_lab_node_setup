@@ -598,11 +598,13 @@ apt install -y glusterfs-client glusterfs-common glusterfs-server keepalived;
 systemctl enable glusterd;
 systemctl start glusterd;
 zfs create rpool/srv/glusterfs;
-mkdir -p /srv/glusterfs/brick1/images;
+mkdir -p /srv/glusterfs/brick1/{images,san};
 gluster peer probe 10.10.100.8
 gluster peer probe 10.10.100.9
 gluster volume create images disperse 3 redundancy 1 10.10.100.7:/srv/glusterfs/brick1/images 10.10.100.8:/srv/glusterfs/brick1/images 10.10.100.9:/srv/glusterfs/brick1/images;
 gluster volume start images;
+gluster volume create san replica 3 transport tcp,rdma 10.10.100.7:/srv/glusterfs/brick1/san 10.10.100.8:/srv/glusterfs/brick1/san 10.10.100.9:/srv/glusterfs/brick1/san;
+gluster volume start san;
 
 ### Keepalived Config - Node 1 ###
 cat << 'EOF' > /etc/keepalived/keepalived.conf;
@@ -675,13 +677,15 @@ EOF
 
 systemctl enable keepalived.service;
 systemctl start keepalived.service;
-echo "10.10.100.100:/images /var/lib/libvirt/images glusterfs defaults,_netdev 0 0" >> /etc/fstab;
+mkdir /var/lib/libvirt/images/{backup,san};
+echo "10.10.100.100:/san /var/lib/libvirt/images/san glusterfs defaults,_netdev 0 0" >> /etc/fstab;
+echo "10.10.100.100:/images /var/lib/libvirt/images/backup glusterfs defaults,_netdev 0 0" >> /etc/fstab;
 mount -a;
 
 ### Create VyOS Router VMs
-mkdir /var/lib/libvirt/images/rtr0{1,2}.exabit.io;
+mkdir /var/lib/libvirt/images/san/rtr0{1,2}.exabit.io;
 
-cat << 'EOF' > /var/lib/libvirt/images/rtr01.exabit.io/rtr01.exabit.io.xml;
+cat << 'EOF' > /var/lib/libvirt/images/san/rtr01.exabit.io/rtr01.exabit.io.xml;
 <domain type='kvm' id='1'>
   <name>rtr01.exabit.io</name>
   <uuid>4f1a4082-8ff8-4000-b9a9-943f4ca6a855</uuid>
@@ -721,7 +725,7 @@ cat << 'EOF' > /var/lib/libvirt/images/rtr01.exabit.io/rtr01.exabit.io.xml;
     <emulator>/usr/bin/qemu-system-x86_64</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
-      <source file='/var/lib/libvirt/images/rtr01.exabit.io/rtr01.exabit.io.qcow2' index='2'/>
+      <source file='/var/lib/libvirt/images/san/rtr01.exabit.io/rtr01.exabit.io.qcow2' index='2'/>
       <backingStore/>
       <target dev='vda' bus='virtio'/>
       <boot order='1'/>
@@ -730,7 +734,7 @@ cat << 'EOF' > /var/lib/libvirt/images/rtr01.exabit.io/rtr01.exabit.io.xml;
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/vyos-rolling-latest.iso' index='1'/>
+      <source file='/var/lib/libvirt/images/san/vyos-rolling-latest.iso' index='1'/>
       <backingStore/>
       <target dev='sda' bus='sata'/>
       <readonly/>
@@ -924,7 +928,7 @@ cat << 'EOF' > /var/lib/libvirt/images/rtr01.exabit.io/rtr01.exabit.io.xml;
 </domain>
 EOF
 
-cat << 'EOF' > /var/lib/libvirt/images/rtr02.exabit.io/rtr02.exabit.io.xml;
+cat << 'EOF' > /var/lib/libvirt/images/san/rtr02.exabit.io/rtr02.exabit.io.xml;
 <domain type='kvm' id='2'>
   <name>rtr02.exabit.io</name>
   <uuid>b3f3bf66-a8e8-4835-8ab8-d05ccc6d54a9</uuid>
@@ -961,14 +965,14 @@ cat << 'EOF' > /var/lib/libvirt/images/rtr02.exabit.io/rtr02.exabit.io.xml;
     <emulator>/usr/bin/qemu-system-x86_64</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
-      <source file='/var/lib/libvirt/images/rtr02.exabit.io/rtr02.exabit.io.qcow2'/>
+      <source file='/var/lib/libvirt/images/san/rtr02.exabit.io/rtr02.exabit.io.qcow2'/>
       <target dev='vda' bus='virtio'/>
       <boot order='1'/>
       <address type='pci' domain='0x0000' bus='0x07' slot='0x00' function='0x0'/>
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/vyos-rolling-latest.iso'/>
+      <source file='/var/lib/libvirt/images/san/vyos-rolling-latest.iso'/>
       <target dev='sda' bus='sata'/>
       <readonly/>
       <boot order='2'/>
@@ -1110,10 +1114,10 @@ cat << 'EOF' > /var/lib/libvirt/images/rtr02.exabit.io/rtr02.exabit.io.xml;
 </domain>
 EOF
 
-virsh define /var/lib/libvirt/images/rtr01.exabit.io/rtr01.exabit.io.xml;
-virsh define /var/lib/libvirt/images/rtr02.exabit.io/rtr02.exabit.io.xml;
+virsh define /var/lib/libvirt/images/san/rtr01.exabit.io/rtr01.exabit.io.xml;
+virsh define /var/lib/libvirt/images/san/rtr02.exabit.io/rtr02.exabit.io.xml;
 
-cat << 'EOF' > /var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
+cat << 'EOF' > /var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
 <domain type='kvm'>
   <name>lab01-cfg01.exabit.io</name>
   <uuid>7d05172f-0961-4471-8599-a863fdc44727</uuid>
@@ -1147,13 +1151,13 @@ cat << 'EOF' > /var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/lab01-cfg01.e
     <emulator>/usr/bin/kvm-spice</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='writethrough' io='threads'/>
-      <source file='/var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/system.qcow2'/>
+      <source file='/var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/system.qcow2'/>
       <target dev='vda' bus='virtio'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/cfg01.exabit.io-config.iso'/>
+      <source file='/var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/cfg01.exabit.io-config.iso'/>
       <target dev='hda' bus='ide'/>
       <readonly/>
       <address type='drive' controller='0' bus='0' target='0' unit='0'/>
@@ -1205,7 +1209,7 @@ cat << 'EOF' > /var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/lab01-cfg01.e
 </domain>
 EOF
 
-virsh define /var/lib/libvirt/images/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
+virsh define /var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
 
 # Node 1:
 virsh autostart rtr01.exabit.io;
@@ -1216,9 +1220,9 @@ virsh autostart rtr02.exabit.io;
 # Node 3:
 virsh autostart lab01-cfg01.exabit.io;
 
-wget --directory-prefix=/var/lib/libvirt/images/ http://images-mirantis-com.s3.amazonaws.com/ubuntu-16-04-x64-mcp2019.2.0.qcow2;
+wget --directory-prefix=/var/lib/libvirt/images/san/ http://images-mirantis-com.s3.amazonaws.com/ubuntu-16-04-x64-mcp2019.2.0.qcow2;
 
-cat << 'EOF' > /var/lib/libvirt/images/create-virtual-machines.sh;
+cat << 'EOF' > /var/lib/libvirt/images/san/create-virtual-machines.sh;
 #!/bin/bash
 pre_name_prefix="lab01-"
 post_name_prefix=.exabit.io
@@ -1368,7 +1372,7 @@ EOF
   done
 done
 
-for vm in $(virsh list --all --name | grep ${dataset_name}); do
+for vm in $(virsh list --all --name | grep ${dataset_name} | grep -v cfg01); do
   virsh dumpxml ${vm} > /var/lib/libvirt/images/${dataset_name}/${vm}/${vm}.xml;
 done
 EOF
