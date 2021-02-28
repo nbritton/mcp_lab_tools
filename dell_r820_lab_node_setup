@@ -262,6 +262,10 @@ mst start;
 mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
 mlxconfig -d /dev/mst/mt4117_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
 mlxconfig -d /dev/mst/mt4117_pciconf0.1 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
+# Remove FlexBoot Option ROM as we don't need it.
+flint -d /dev/mst/mt4099_pci_cr0 --allow_rom_change drom;
+flint -d /dev/mst/mt4099_pci_cr1 --allow_rom_change drom;
+flint -d /dev/mst/mt4117_pciconf0 --allow_rom_change drom;
 
 ### Enable KVM virtualization:
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
