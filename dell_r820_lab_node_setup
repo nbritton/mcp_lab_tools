@@ -395,9 +395,43 @@ network:
 EOF
 netplan apply;
 
-### Install GlusterFS ###
-apt install -y glusterfs-client glusterfs-common glusterfs-server keepalived;
-
 apt update && apt upgrade -y;
 
 reboot;
+
+### Install GlusterFS ###
+apt install -y glusterfs-client glusterfs-common glusterfs-server keepalived;
+systemctl enable glusterd;
+systemctl start glusterd;
+zfs create rpool/srv/glusterfs;
+mkdir -p /srv/glusterfs/brick1/images;
+gluster peer probe 10.10.100.8
+gluster peer probe 10.10.100.9
+gluster volume create images disperse 3 redundancy 1 10.10.100.7:/srv/glusterfs/brick1/images 10.10.100.8:/srv/glusterfs/brick1/images 10.10.100.9:/srv/glusterfs/brick1/images;
+gluster volume start images;
+
+cat << 'EOF' > /etc/keepalived/keepalived.conf;
+vrrp_instance gluster {
+    state MASTER
+    interface gluster
+    virtual_router_id 100
+    priority 101
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 31459
+    }
+    virtual_ipaddress {
+        10.10.100.100
+    }
+}
+EOF
+
+systemctl start keepalived.service;
+echo "10.10.100.100:/images /var/lib/libvirt/images glusterfs defaults,_netdev 0 0" >> /etc/fstab;
+mount -a;
+
+
+
+
+
