@@ -301,10 +301,10 @@ network:
   
     eno1: {mtu: 9000}
     eno2: {mtu: 9000}
-    enp2s0: {}
-    enp2s0d1: {}
-    enp66s0f0: {mtu: 9000}
-    enp66s0f1: {mtu: 9000}
+    enp2s0: {mtu: 9000}
+    enp4s0: {mtu: 9000}
+    enp66s0f0: {}
+    enp66s0f1: {}
     dummy1: {mtu: 9000}
     dummy2: {mtu: 9000}
     dummy3: {mtu: 9000}
@@ -323,7 +323,7 @@ network:
         
     bond1:
       mtu: 9000
-      interfaces: [enp66s0f0, enp66s0f1]
+      interfaces: [enp2s0, enp4s0]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
@@ -340,11 +340,11 @@ network:
         addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
         
     internet:
-      interfaces: [enp2s0]
+      interfaces: [enp66s0f0]
       dhcp4: yes
 
     ipmi:
-      interfaces: [enp2s0d1]
+      interfaces: [enp66s0f1]
       dhcp4: yes 
       
     provider:
