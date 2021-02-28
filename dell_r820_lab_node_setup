@@ -377,17 +377,17 @@ network:
 
     gluster:
       mtu: 9000
-      interfaces: [bond2-vlan144]
+      interfaces: [bond2-vlan100]
       addresses:
-        - 192.168.144.7/24
+        - 10.10.100.7/24
         
   vlans:
     bond0-vlan10:
       id: 10
       link: bond0
       
-    bond2-vlan144:
-      id: 144
+    bond2-vlan100:
+      id: 100
       link: bond2
 EOF
 netplan apply;
