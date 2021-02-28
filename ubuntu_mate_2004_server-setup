@@ -67,12 +67,11 @@ apt -y install bash-completion bash-doc bc build-essential chromium-browser comm
 
 ### Install Dell OpenManage:
 echo 'deb http://linux.dell.com/repo/community/openmanage/950/focal focal main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+echo 'deb http://linux.dell.com/repo/community/openmanage/iSM/360/focal focal main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
 gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
 gpg -a --export 1285491434D8786F | sudo apt-key add -;
-apt update && apt -y install srvadmin-all syscfg raidcfg dcism;
-exit;
-sudo -i;
-apt -y install --reinstall srvadmin-all;
+apt update && apt -y install srvadmin-all syscfg dcism-osc;
+apt -y install dcism;
 
 ### Force enable x2APIC mode:
 sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="intremap=no_x2apic_optout /' /etc/default/grub;
