@@ -310,6 +310,8 @@ network:
     enp4s0: {mtu: 9000}
     enp66s0f0: {}
     enp66s0f1: {}
+    enp67s0: {mtu: 9000}
+    enp67s0d1: {mtu: 9000}
     dummy1: {mtu: 9000}
     dummy2: {mtu: 9000}
     dummy3: {mtu: 9000}
@@ -335,6 +337,14 @@ network:
         mii-monitor-interval: 100
         transmit-hash-policy: encap3+4
 
+    bond2:
+      mtu: 9000
+      interfaces: [enp67s0, enp67s0d1]
+      parameters:
+        mode: active-backup
+        primary: enp67s0
+        mii-monitor-interval: 100
+
   bridges:
 
     control:
@@ -356,6 +366,12 @@ network:
       mtu: 9000
       interfaces: [bond1]
       dhcp4: yes
+
+    gluster:
+      mtu: 9000
+      interfaces: [bond2]
+      addresses:
+        - 192.168.144.1/24
 EOF
 netplan apply;
 
