@@ -91,7 +91,7 @@ for i in $(seq 6); do printf "[NetDev]\nName=dummy${i}\nKind=dummy\n" > /etc/sys
 systemctl restart systemd-networkd.service;
 
 ### Netplan configuration ###
-rm /etc/netplan/01-network-manager-all.yaml;
+test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
 cat << 'EOF' > /etc/netplan/01-netcfg.yaml
 network:
   version: 2
