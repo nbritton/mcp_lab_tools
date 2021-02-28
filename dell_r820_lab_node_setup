@@ -607,14 +607,19 @@ gluster volume start images;
 ### Keepalived Config - Node 1 ###
 cat << 'EOF' > /etc/keepalived/keepalived.conf;
 vrrp_instance gluster {
-    state MASTER
+    state BACKUP
+    nopreempt
+    garp_master_delay 5
+    garp_master_repeat 3
+    garp_master_refresh 1
+    dont_track_primary
     interface gluster
     virtual_router_id 100
     priority 101
     advert_int 1
     authentication {
-        auth_type PASS
-        auth_pass 31459
+        auth_type AH
+        auth_pass 31415926
     }
     virtual_ipaddress {
         10.10.100.100
@@ -625,14 +630,19 @@ EOF
 ### Keepalived Config - Node 2 ###
 cat << 'EOF' > /etc/keepalived/keepalived.conf;
 vrrp_instance gluster {
-    state MASTER
+    state BACKUP
+    nopreempt
+    garp_master_delay 5
+    garp_master_repeat 3
+    garp_master_refresh 1
+    dont_track_primary
     interface gluster
     virtual_router_id 100
     priority 102
     advert_int 1
     authentication {
-        auth_type PASS
-        auth_pass 31459
+        auth_type AH
+        auth_pass 31415926
     }
     virtual_ipaddress {
         10.10.100.100
@@ -643,14 +653,19 @@ EOF
 ### Keepalived Config - Node 3 ###
 cat << 'EOF' > /etc/keepalived/keepalived.conf;
 vrrp_instance gluster {
-    state MASTER
+    state BACKUP
+    nopreempt
+    garp_master_delay 5
+    garp_master_repeat 3
+    garp_master_refresh 1
+    dont_track_primary
     interface gluster
     virtual_router_id 100
     priority 103
     advert_int 1
     authentication {
-        auth_type PASS
-        auth_pass 31459
+        auth_type AH
+        auth_pass 31415926
     }
     virtual_ipaddress {
         10.10.100.100
@@ -658,6 +673,7 @@ vrrp_instance gluster {
 }
 EOF
 
+systemctl enable keepalived.service;
 systemctl start keepalived.service;
 echo "10.10.100.100:/images /var/lib/libvirt/images glusterfs defaults,_netdev 0 0" >> /etc/fstab;
 mount -a;
