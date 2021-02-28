@@ -1378,7 +1378,7 @@ done
 EOF
 
 ### Node 1
-for vm in lab01-{kvm,gtw}0{2,3}; do
+for vm in lab01-{kvm,gtw}0{2,3}.exabit.io; do
   virsh shutdown ${vm};
   virsh undefine ${vm};
 done
