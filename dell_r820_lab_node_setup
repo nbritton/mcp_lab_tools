@@ -260,6 +260,8 @@ systemctl disable openibd;
 ## Configure Mellanox Card:
 mst start;
 mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4099_pciconf1 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4099_pciconf2 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
 mlxconfig -d /dev/mst/mt4117_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
 mlxconfig -d /dev/mst/mt4117_pciconf0.1 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
 # Remove FlexBoot Option ROM as we don't need it.
