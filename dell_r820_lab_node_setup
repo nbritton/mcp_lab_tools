@@ -1411,5 +1411,12 @@ salt-call saltutil.sync_all
 salt-call state.apply linux.system.repo
 salt-call state.apply salt.minion
 
+### Run from cfg01 node:
+salt 'kvm*' state.apply linux.system;
+salt 'kvm*' pkg.upgrade;
+salt 'kvm*' cmd.run 'apt -y upgrade';
+salt 'kvm*' cmd.run 'reboot' --async;
+salt 'kvm*' test.ping;
+
 
 
