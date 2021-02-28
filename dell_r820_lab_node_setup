@@ -1191,13 +1191,13 @@ EOF
 
 virsh define /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
 
-# node 1:
+# Node 1:
 virsh autostart rtr01.exabit.io;
 
-# node 2:
+# Node 2:
 virsh autostart rtr02.exabit.io;
 
-# node 3:
+# Node 3:
 virsh autostart cfg01.exabit.io;
 
 
