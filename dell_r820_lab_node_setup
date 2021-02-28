@@ -920,13 +920,13 @@ cat << 'EOF' > /var/lib/libvirt/images/cfg01.exabit.io/cfg01.exabit.io.xml;
     </controller>
     <interface type='bridge'>
       <mac address='52:54:00:19:1d:6e'/>
-      <source bridge='br-mgm'/>
+      <source bridge='mgmt'/>
       <model type='virtio'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
     </interface>
     <interface type='bridge'>
       <mac address='52:54:00:f1:06:ff'/>
-      <source bridge='br-ctl'/>
+      <source bridge='control'/>
       <model type='virtio'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
     </interface>
