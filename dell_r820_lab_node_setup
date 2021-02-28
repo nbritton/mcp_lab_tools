@@ -341,9 +341,10 @@ network:
       mtu: 9000
       interfaces: [enp67s0, enp67s0d1]
       parameters:
-        mode: active-backup
-        primary: enp67s0
+        mode: 802.3ad
+        lacp-rate: fast
         mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
 
   bridges:
 
