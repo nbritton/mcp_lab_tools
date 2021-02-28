@@ -265,6 +265,7 @@ mlxconfig -d /dev/mst/mt4117_pciconf0.1 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=
 # Remove FlexBoot Option ROM as we don't need it.
 flint -d /dev/mst/mt4099_pci_cr0 --allow_rom_change drom;
 flint -d /dev/mst/mt4099_pci_cr1 --allow_rom_change drom;
+flint -d /dev/mst/mt4099_pci_cr2 --allow_rom_change drom;
 flint -d /dev/mst/mt4117_pciconf0 --allow_rom_change drom;
 
 ### Enable KVM virtualization:
