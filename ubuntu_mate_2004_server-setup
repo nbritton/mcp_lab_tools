@@ -50,12 +50,13 @@ rmmod rdma_ucm ib_iser rpcrdma rdma_cm;
 
 ## Configure Mellanox Card:
 mst start;
-mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=0 LINK_TYPE_P1=1 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0
-mlxconfig -d /dev/mst/mt4099_pciconf1 set SRIOV_EN=1 NUM_OF_VFS=8 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4117_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
+mlxconfig -d /dev/mst/mt4117_pciconf0.1 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
 
 ### Nvidia GPU Compute Drivers:
 echo "blacklist nouveau" > /etc/modprobe.d/blacklist-nouveau.conf;
-apt install nvidia-headless-440 nvidia-utils-440;
+apt install nvidia-headless-460 nvidia-utils-460;
 
 ### Enable KVM virtualization:
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
