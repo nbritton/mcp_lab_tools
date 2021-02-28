@@ -40,6 +40,7 @@ adduser xrdp ssl-cert;
 systemctl restart xrdp;
 
 ### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
+# Installing this will reset the NIC, so if your primary NIC is a Mellanox then don't run this remotely.
 wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-2.1.8.0/MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
 tar -axf MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
 cd MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64/;
