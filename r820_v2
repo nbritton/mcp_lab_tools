@@ -1,0 +1,1250 @@
+## Do a stock install of Ubuntu Mate Desktop 20.04 LTS using the live DVD ISO.
+## https://ubuntu-mate.org/download/
+
+## Reboot into new system.
+
+apt update && apt -y upgrade;
+apt install openssh-server;
+systemctl enable ssh;
+ip a | grep "inet ";
+
+## SSH into new system.
+
+## Install various essential packages
+apt install -y autoconf automake autotools-dev bash-completion bash-doc bc bison build-essential chromium-browser \
+chrpath command-not-found cpufrequtils debhelper dkms dpatch flex gfortran graphviz htop httpie iftop iotop \
+iozone3 iperf3 iputils-tracepath jq libgfortran4 libgpgme11 libltdl-dev libnl-3-dev libnl-route-3-dev libssh2-1 \
+linux-headers-lowlatency linux-image-lowlatency linux-tools-lowlatency lldpad lm-sensors lsscsi m4 mtr nano \
+net-tools netdiscover ngrep nmap pcregrep powertop quilt rdma-core smartmontools socat speedtest-cli stress-ng \
+swig sysstat tcl tk ubuntu-server vim xrdp zfsutils-linux;
+
+## Set system's hostname to machine type and service tag, i.g. r820-abcd123
+HOSTNAME=$(dmidecode -t 1 | awk '/Product/ {printf tolower($NF"-")}'; dmidecode -t 1 | awk '/Serial/ {print tolower($NF)}');
+echo "$HOSTNAME" > /etc/hostname;
+sed -i "s/127.0.1.1.*/127.0.1.1\t$HOSTNAME.exabit.io $HOSTNAME/" /etc/hosts;
+
+## Set grub defaults
+sed -i 's/GRUB_TIMEOUT_STYLE=hidden/#GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub;
+sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=5/' /etc/default/grub;
+
+## Disable splash screen, quiet boot, CPU mitigations (i.g. meltdown, spectre), and IPv6.
+## Enable x2apic mode, and Intel VT-d I/O MMU support.
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT="intel_iommu=on intremap=no_x2apic_optout ipv6.disable=1 mitigations=off"/' /etc/default/grub;
+
+update-grub;
+
+### Setup SSH public key for password-less login:
+u=nbritton;
+install -d -o $u -g $u -m 700 /home/$u/.ssh;
+curl -s https://github.com/$u.keys > /home/$u/.ssh/id_ed25519.pub;
+chown $u:$u /home/$u/.ssh/id_ed25519.pub;
+install -o $u -g $u -m 600 /home/$u/.ssh/id_ed25519.pub /home/$u/.ssh/authorized_keys;
+
+### Enable password-less sudo for users in the sudo group:
+sed -i 's/^%sudo.*ALL$/%sudo\tALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers;
+
+### Setup SSH client:
+sed -i 's/^#   StrictHostKeyChecking ask/    StrictHostKeyChecking accept-new/' /etc/ssh/ssh_config;
+sed -i 's/^#   Ciphers .*/    Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com/' /etc/ssh/ssh_config;
+
+### Disable password based remote SSH login:
+sed -i 's/^#PasswordAuthentication yes$/PasswordAuthentication no/' /etc/ssh/sshd_config;
+sed -i 's/^UsePAM yes$/#UsePAM yes/' /etc/ssh/sshd_config;
+
+## Disable GUI on the system console:
+systemctl disable graphical.target;
+systemctl set-default multi-user.target;
+
+## Configure xrdp for remote GUI access with MATE:
+adduser xrdp ssl-cert;
+systemctl restart xrdp;
+
+### Disable UFW - Firewall ###
+systemctl disable ufw;
+systemctl stop ufw;
+ufw disable;
+apt remove -y --purge ufw;
+
+### Remove network manager, as we use networkd and netplan instead ###
+apt remove -y --purge network-manager;
+
+### Setup Network Dummy Interface ###
+for i in $(seq 4); do printf "[NetDev]\nName=dummy${i}\nKind=dummy\n" > /etc/systemd/network/dummy${i}.netdev; done
+systemctl restart systemd-networkd.service;
+
+### Netplan configuration - Node 1 ###
+test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    enp2s0: {mtu: 9000}
+    enp4s0: {mtu: 9000}
+    enp66s0f0: {}
+    enp66s0f1: {}
+    enp67s0: {mtu: 9000}
+    enp67s0d1: {mtu: 9000}
+    dummy1: {mtu: 9000}
+    dummy2: {mtu: 9000}
+    dummy3: {mtu: 9000}
+    dummy4: {mtu: 9000}
+
+  bonds:
+
+    bond0:
+      mtu: 9000
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+    bond1:
+      mtu: 9000
+      interfaces: [enp2s0, enp4s0]
+      parameters:
+        mode: balance-tlb
+        primary: enp2s0
+        mii-monitor-interval: 100
+        transmit-hash-policy: encap3+4
+
+    bond2:
+      mtu: 9000
+      interfaces: [enp67s0, enp67s0d1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+  bridges:
+
+    mgmt:
+      mtu: 9000
+      interfaces: [bond0]
+      addresses:
+        - 10.10.1.7/24
+      gateway4: 10.10.1.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+
+    control:
+      interfaces: [bond0-vlan10]
+      addresses:
+        - 10.10.10.7/24
+        
+    internet:
+      interfaces: [enp66s0f0]
+      dhcp4: yes
+
+    ipmi:
+      interfaces: [enp66s0f1]
+      dhcp4: yes
+
+    provider:
+      mtu: 9000
+      interfaces: [bond1]
+      dhcp4: yes
+
+    gluster:
+      mtu: 9000
+      interfaces: [bond2-vlan100]
+      addresses:
+        - 10.10.100.7/24
+        
+  vlans:
+    bond0-vlan10:
+      id: 10
+      link: bond0
+      
+    bond2-vlan100:
+      id: 100
+      link: bond2
+EOF
+
+### Netplan configuration - Node 2 ###
+test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    enp2s0: {mtu: 9000}
+    enp4s0: {mtu: 9000}
+    enp66s0f0: {}
+    enp66s0f1: {}
+    enp67s0: {mtu: 9000}
+    enp67s0d1: {mtu: 9000}
+    dummy1: {mtu: 9000}
+    dummy2: {mtu: 9000}
+    dummy3: {mtu: 9000}
+    dummy4: {mtu: 9000}
+
+  bonds:
+
+    bond0:
+      mtu: 9000
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+    bond1:
+      mtu: 9000
+      interfaces: [enp2s0, enp4s0]
+      parameters:
+        mode: balance-tlb
+        primary: enp2s0
+        mii-monitor-interval: 100
+        transmit-hash-policy: encap3+4
+
+    bond2:
+      mtu: 9000
+      interfaces: [enp67s0, enp67s0d1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+  bridges:
+
+    mgmt:
+      mtu: 9000
+      interfaces: [bond0]
+      addresses:
+        - 10.10.1.8/24
+      gateway4: 10.10.1.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+
+    control:
+      interfaces: [bond0-vlan10]
+      addresses:
+        - 10.10.10.8/24
+        
+    internet:
+      interfaces: [enp66s0f0]
+      dhcp4: yes
+
+    ipmi:
+      interfaces: [enp66s0f1]
+      dhcp4: yes
+
+    provider:
+      mtu: 9000
+      interfaces: [bond1]
+      dhcp4: yes
+
+    gluster:
+      mtu: 9000
+      interfaces: [bond2-vlan100]
+      addresses:
+        - 10.10.100.8/24
+        
+  vlans:
+    bond0-vlan10:
+      id: 10
+      link: bond0
+      
+    bond2-vlan100:
+      id: 100
+      link: bond2
+EOF
+netplan apply;
+
+### Netplan configuration - Node 3 ###
+test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
+cat << 'EOF' > /etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+
+    eno1: {mtu: 9000}
+    eno2: {mtu: 9000}
+    enp2s0: {mtu: 9000}
+    enp4s0: {mtu: 9000}
+    enp66s0f0: {}
+    enp66s0f1: {}
+    enp67s0: {mtu: 9000}
+    enp67s0d1: {mtu: 9000}
+    dummy1: {mtu: 9000}
+    dummy2: {mtu: 9000}
+    dummy3: {mtu: 9000}
+    dummy4: {mtu: 9000}
+
+  bonds:
+
+    bond0:
+      mtu: 9000
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+    bond1:
+      mtu: 9000
+      interfaces: [enp2s0, enp4s0]
+      parameters:
+        mode: balance-tlb
+        primary: enp2s0
+        mii-monitor-interval: 100
+        transmit-hash-policy: encap3+4
+
+    bond2:
+      mtu: 9000
+      interfaces: [enp67s0, enp67s0d1]
+      parameters:
+        mode: 802.3ad
+        lacp-rate: fast
+        mii-monitor-interval: 100
+        transmit-hash-policy: layer3+4
+
+  bridges:
+
+    mgmt:
+      mtu: 9000
+      interfaces: [bond0]
+      addresses:
+        - 10.10.1.9/24
+      gateway4: 10.10.1.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+
+    control:
+      interfaces: [bond0-vlan10]
+      addresses:
+        - 10.10.10.9/24
+        
+    internet:
+      interfaces: [enp66s0f0]
+      dhcp4: yes
+
+    ipmi:
+      interfaces: [enp66s0f1]
+      dhcp4: yes
+
+    provider:
+      mtu: 9000
+      interfaces: [bond1]
+      dhcp4: yes
+
+    gluster:
+      mtu: 9000
+      interfaces: [bond2-vlan100]
+      addresses:
+        - 10.10.100.9/24
+        
+  vlans:
+    bond0-vlan10:
+      id: 10
+      link: bond0
+      
+    bond2-vlan100:
+      id: 100
+      link: bond2
+EOF
+netplan apply
+
+
+### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
+# Installing this will reset the NIC, so if your primary NIC is a Mellanox then don't run this remotely.
+wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-2.1.8.0/MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
+tar -axf MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
+cd MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64/;
+rmmod rdma_ucm ib_iser rpcrdma rdma_cm;
+./mlnxofedinstall;
+systemctl disable openibd; 
+
+wget https://content.mellanox.com/ofed/MLNX_OFED-5.2-2.2.0.0/MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64.tgz;
+tar -axf MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64.tgz;
+cd MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64/;
+rmmod rdma_ucm ib_iser rpcrdma rdma_cm;
+./mlnxofedinstall --skip-unsupported-devices-check;
+
+
+## Configure Mellanox Card:
+mst start;
+mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4099_pciconf1 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4099_pciconf2 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+mlxconfig -d /dev/mst/mt4117_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
+mlxconfig -d /dev/mst/mt4117_pciconf0.1 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
+# Remove FlexBoot Option ROM as we don't need it.
+flint -d /dev/mst/mt4099_pci_cr0 --allow_rom_change drom;
+flint -d /dev/mst/mt4099_pci_cr1 --allow_rom_change drom;
+flint -d /dev/mst/mt4099_pci_cr2 --allow_rom_change drom;
+flint -d /dev/mst/mt4117_pciconf0 --allow_rom_change drom;
+
+# Create data
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O data raidz1 $(ls /dev/disk/by-id/ata-ST5000LM000*) log /dev/md0p1 cache /dev/md0p2;
+
+### Enable KVM virtualization:
+echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
+apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager;
+
+
+### Install Dell OpenManage:
+echo 'deb http://linux.dell.com/repo/community/openmanage/950/focal focal main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+echo 'deb http://linux.dell.com/repo/community/openmanage/iSM/360/focal focal main' | sudo tee -a /etc/apt/sources.list.d/linux.dell.com.sources.list;
+gpg --keyserver ha.pool.sks-keyservers.net --recv-key 1285491434D8786F;
+gpg -a --export 1285491434D8786F | sudo apt-key add -;
+apt update && apt -y install srvadmin-all syscfg dcism-osc;
+apt -y install dcism;
+
+
+
+apt update && apt upgrade -y;
+
+reboot;
+
+### Install GlusterFS ###
+apt install -y glusterfs-client glusterfs-common glusterfs-server keepalived;
+systemctl enable glusterd;
+systemctl start glusterd;
+zfs create rpool/srv/glusterfs;
+mkdir -p /srv/glusterfs/brick1/{images,san};
+gluster peer probe 10.10.100.8
+gluster peer probe 10.10.100.9
+gluster volume create images disperse 3 redundancy 1 10.10.100.7:/srv/glusterfs/brick1/images 10.10.100.8:/srv/glusterfs/brick1/images 10.10.100.9:/srv/glusterfs/brick1/images;
+gluster volume start images;
+gluster volume create san replica 3 transport tcp,rdma 10.10.100.7:/srv/glusterfs/brick1/san 10.10.100.8:/srv/glusterfs/brick1/san 10.10.100.9:/srv/glusterfs/brick1/san;
+gluster volume start san;
+
+### Keepalived Config - Node 1 ###
+cat << 'EOF' > /etc/keepalived/keepalived.conf;
+vrrp_instance gluster {
+    state BACKUP
+    nopreempt
+    garp_master_delay 5
+    garp_master_repeat 3
+    garp_master_refresh 1
+    dont_track_primary
+    interface gluster
+    virtual_router_id 100
+    priority 101
+    advert_int 1
+    authentication {
+        auth_type AH
+        auth_pass 31415926
+    }
+    virtual_ipaddress {
+        10.10.100.100
+    }
+}
+EOF
+
+### Keepalived Config - Node 2 ###
+cat << 'EOF' > /etc/keepalived/keepalived.conf;
+vrrp_instance gluster {
+    state BACKUP
+    nopreempt
+    garp_master_delay 5
+    garp_master_repeat 3
+    garp_master_refresh 1
+    dont_track_primary
+    interface gluster
+    virtual_router_id 100
+    priority 102
+    advert_int 1
+    authentication {
+        auth_type AH
+        auth_pass 31415926
+    }
+    virtual_ipaddress {
+        10.10.100.100
+    }
+}
+EOF
+
+### Keepalived Config - Node 3 ###
+cat << 'EOF' > /etc/keepalived/keepalived.conf;
+vrrp_instance gluster {
+    state BACKUP
+    nopreempt
+    garp_master_delay 5
+    garp_master_repeat 3
+    garp_master_refresh 1
+    dont_track_primary
+    interface gluster
+    virtual_router_id 100
+    priority 103
+    advert_int 1
+    authentication {
+        auth_type AH
+        auth_pass 31415926
+    }
+    virtual_ipaddress {
+        10.10.100.100
+    }
+}
+EOF
+
+systemctl enable keepalived.service;
+systemctl start keepalived.service;
+mkdir /var/lib/libvirt/images/{backup,san};
+echo "10.10.100.100:/san /var/lib/libvirt/images/san glusterfs defaults,_netdev 0 0" >> /etc/fstab;
+echo "10.10.100.100:/images /var/lib/libvirt/images/backup glusterfs defaults,_netdev 0 0" >> /etc/fstab;
+mount -a;
+
+### Create VyOS Router VMs
+mkdir /var/lib/libvirt/images/san/rtr0{1,2}.exabit.io;
+
+cat << 'EOF' > /var/lib/libvirt/images/san/rtr01.exabit.io/rtr01.exabit.io.xml;
+<domain type='kvm' id='1'>
+  <name>rtr01.exabit.io</name>
+  <uuid>4f1a4082-8ff8-4000-b9a9-943f4ca6a855</uuid>
+  <metadata>
+    <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
+      <libosinfo:os id="http://debian.org/debian/10"/>
+    </libosinfo:libosinfo>
+  </metadata>
+  <memory unit='KiB'>2097152</memory>
+  <currentMemory unit='KiB'>2097152</currentMemory>
+  <vcpu placement='static'>4</vcpu>
+  <resource>
+    <partition>/machine</partition>
+  </resource>
+  <os>
+    <type arch='x86_64' machine='pc-q35-4.2'>hvm</type>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+    <vmport state='off'/>
+  </features>
+  <cpu mode='host-model' check='partial'/>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/san/rtr01.exabit.io/rtr01.exabit.io.qcow2' index='2'/>
+      <backingStore/>
+      <target dev='vda' bus='virtio'/>
+      <boot order='1'/>
+      <alias name='virtio-disk0'/>
+      <address type='pci' domain='0x0000' bus='0x07' slot='0x00' function='0x0'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='/var/lib/libvirt/images/san/vyos-rolling-latest.iso' index='1'/>
+      <backingStore/>
+      <target dev='sda' bus='sata'/>
+      <readonly/>
+      <boot order='2'/>
+      <alias name='sata0-0-0'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>
+    <controller type='usb' index='0' model='qemu-xhci' ports='15'>
+      <alias name='usb'/>
+      <address type='pci' domain='0x0000' bus='0x05' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='sata' index='0'>
+      <alias name='ide'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x1f' function='0x2'/>
+    </controller>
+    <controller type='pci' index='0' model='pcie-root'>
+      <alias name='pcie.0'/>
+    </controller>
+    <controller type='pci' index='1' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='1' port='0x10'/>
+      <alias name='pci.1'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='2' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='2' port='0x11'/>
+      <alias name='pci.2'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x1'/>
+    </controller>
+    <controller type='pci' index='3' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='3' port='0x12'/>
+      <alias name='pci.3'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x2'/>
+    </controller>
+    <controller type='pci' index='4' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='4' port='0x13'/>
+      <alias name='pci.4'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x3'/>
+    </controller>
+    <controller type='pci' index='5' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='5' port='0x14'/>
+      <alias name='pci.5'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x4'/>
+    </controller>
+    <controller type='pci' index='6' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='6' port='0x15'/>
+      <alias name='pci.6'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x5'/>
+    </controller>
+    <controller type='pci' index='7' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='7' port='0x16'/>
+      <alias name='pci.7'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x6'/>
+    </controller>
+    <controller type='pci' index='8' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='8' port='0x17'/>
+      <alias name='pci.8'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x7'/>
+    </controller>
+    <controller type='pci' index='9' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='9' port='0x18'/>
+      <alias name='pci.9'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='10' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='10' port='0x19'/>
+      <alias name='pci.10'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x1'/>
+    </controller>
+    <controller type='virtio-serial' index='0'>
+      <alias name='virtio-serial0'/>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x00' function='0x0'/>
+    </controller>
+    <interface type='bridge'>
+      <mac address='52:54:00:68:44:b6'/>
+      <source bridge='internet'/>
+      <target dev='vnet0'/>
+      <model type='virtio'/>
+      <alias name='net0'/>
+      <address type='pci' domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:3a:10:8b'/>
+      <source bridge='ipmi'/>
+      <target dev='vnet1'/>
+      <model type='virtio'/>
+      <alias name='net1'/>
+      <address type='pci' domain='0x0000' bus='0x02' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:cc:1f:cd'/>
+      <source bridge='mgmt'/>
+      <target dev='vnet2'/>
+      <model type='virtio'/>
+      <alias name='net2'/>
+      <address type='pci' domain='0x0000' bus='0x03' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:d9:6f:6a'/>
+      <source bridge='control'/>
+      <target dev='vnet3'/>
+      <model type='virtio'/>
+      <alias name='net3'/>
+      <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:6d:50:cb'/>
+      <source bridge='provider'/>
+      <target dev='vnet4'/>
+      <model type='virtio'/>
+      <alias name='net4'/>
+      <address type='pci' domain='0x0000' bus='0x0a' slot='0x00' function='0x0'/>
+    </interface>
+    <serial type='pty'>
+      <source path='/dev/pts/1'/>
+      <target type='isa-serial' port='0'>
+        <model name='isa-serial'/>
+      </target>
+      <alias name='serial0'/>
+    </serial>
+    <console type='pty' tty='/dev/pts/1'>
+      <source path='/dev/pts/1'/>
+      <target type='serial' port='0'/>
+      <alias name='serial0'/>
+    </console>
+    <channel type='unix'>
+      <source mode='bind' path='/var/lib/libvirt/qemu/channel/target/domain-1-rtr01.exabit.io/org.qemu.guest_agent.0'/>
+      <target type='virtio' name='org.qemu.guest_agent.0' state='connected'/>
+      <alias name='channel0'/>
+      <address type='virtio-serial' controller='0' bus='0' port='1'/>
+    </channel>
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0' state='disconnected'/>
+      <alias name='channel1'/>
+      <address type='virtio-serial' controller='0' bus='0' port='2'/>
+    </channel>
+    <input type='tablet' bus='usb'>
+      <alias name='input0'/>
+      <address type='usb' bus='0' port='1'/>
+    </input>
+    <input type='mouse' bus='ps2'>
+      <alias name='input1'/>
+    </input>
+    <input type='keyboard' bus='ps2'>
+      <alias name='input2'/>
+    </input>
+    <graphics type='spice' port='5900' autoport='yes' listen='127.0.0.1'>
+      <listen type='address' address='127.0.0.1'/>
+      <image compression='off'/>
+    </graphics>
+    <video>
+      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1' primary='yes'/>
+      <alias name='video0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x0'/>
+    </video>
+    <redirdev bus='usb' type='spicevmc'>
+      <alias name='redir0'/>
+      <address type='usb' bus='0' port='2'/>
+    </redirdev>
+    <redirdev bus='usb' type='spicevmc'>
+      <alias name='redir1'/>
+      <address type='usb' bus='0' port='3'/>
+    </redirdev>
+    <memballoon model='virtio'>
+      <alias name='balloon0'/>
+      <address type='pci' domain='0x0000' bus='0x08' slot='0x00' function='0x0'/>
+    </memballoon>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <alias name='rng0'/>
+      <address type='pci' domain='0x0000' bus='0x09' slot='0x00' function='0x0'/>
+    </rng>
+  </devices>
+  <seclabel type='dynamic' model='apparmor' relabel='yes'>
+    <label>libvirt-4f1a4082-8ff8-4000-b9a9-943f4ca6a855</label>
+    <imagelabel>libvirt-4f1a4082-8ff8-4000-b9a9-943f4ca6a855</imagelabel>
+  </seclabel>
+  <seclabel type='dynamic' model='dac' relabel='yes'>
+    <label>+64055:+108</label>
+    <imagelabel>+64055:+108</imagelabel>
+  </seclabel>
+</domain>
+EOF
+
+cat << 'EOF' > /var/lib/libvirt/images/san/rtr02.exabit.io/rtr02.exabit.io.xml;
+<domain type='kvm' id='2'>
+  <name>rtr02.exabit.io</name>
+  <uuid>b3f3bf66-a8e8-4835-8ab8-d05ccc6d54a9</uuid>
+  <metadata>
+    <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
+      <libosinfo:os id="http://debian.org/debian/10"/>
+    </libosinfo:libosinfo>
+  </metadata>
+  <memory unit='KiB'>2097152</memory>
+  <currentMemory unit='KiB'>2097152</currentMemory>
+  <vcpu placement='static'>4</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc-q35-4.2'>hvm</type>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+    <vmport state='off'/>
+  </features>
+  <cpu mode='host-model' check='partial'/>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/san/rtr02.exabit.io/rtr02.exabit.io.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+      <boot order='1'/>
+      <address type='pci' domain='0x0000' bus='0x07' slot='0x00' function='0x0'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='/var/lib/libvirt/images/san/vyos-rolling-latest.iso'/>
+      <target dev='sda' bus='sata'/>
+      <readonly/>
+      <boot order='2'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>
+    <controller type='usb' index='0' model='qemu-xhci' ports='15'>
+      <address type='pci' domain='0x0000' bus='0x05' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='sata' index='0'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x1f' function='0x2'/>
+    </controller>
+    <controller type='pci' index='0' model='pcie-root'/>
+    <controller type='pci' index='1' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='1' port='0x10'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='2' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='2' port='0x11'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x1'/>
+    </controller>
+    <controller type='pci' index='3' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='3' port='0x12'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x2'/>
+    </controller>
+    <controller type='pci' index='4' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='4' port='0x13'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x3'/>
+    </controller>
+    <controller type='pci' index='5' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='5' port='0x14'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x4'/>
+    </controller>
+    <controller type='pci' index='6' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='6' port='0x15'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x5'/>
+    </controller>
+    <controller type='pci' index='7' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='7' port='0x16'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x6'/>
+    </controller>
+    <controller type='pci' index='8' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='8' port='0x17'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x7'/>
+    </controller>
+    <controller type='pci' index='9' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='9' port='0x18'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='10' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='10' port='0x19'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x1'/>
+    </controller>
+    <controller type='virtio-serial' index='0'>
+      <address type='pci' domain='0x0000' bus='0x06' slot='0x00' function='0x0'/>
+    </controller>
+    <interface type='bridge'>
+      <mac address='52:54:00:57:33:a5'/>
+      <source bridge='internet'/>
+      <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:29:0f:7a'/>
+      <source bridge='ipmi'/>
+      <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x02' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:dd:0e:bc'/>
+      <source bridge='mgmt'/>
+      <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x03' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:c8:5e:59'/>
+      <source bridge='control'/>
+      <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:5c:4f:ba'/>
+      <source bridge='provider'/>
+      <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x0a' slot='0x00' function='0x0'/>
+    </interface>
+    <serial type='pty'>
+      <target type='isa-serial' port='0'>
+        <model name='isa-serial'/>
+      </target>
+    </serial>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+      <address type='virtio-serial' controller='0' bus='0' port='1'/>
+    </channel>
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0'/>
+      <address type='virtio-serial' controller='0' bus='0' port='2'/>
+    </channel>
+    <input type='tablet' bus='usb'>
+      <address type='usb' bus='0' port='1'/>
+    </input>
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+    <graphics type='spice' autoport='yes'>
+      <listen type='address'/>
+      <image compression='off'/>
+    </graphics>
+    <video>
+      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1' primary='yes'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x0'/>
+    </video>
+    <redirdev bus='usb' type='spicevmc'>
+      <address type='usb' bus='0' port='2'/>
+    </redirdev>
+    <redirdev bus='usb' type='spicevmc'>
+      <address type='usb' bus='0' port='3'/>
+    </redirdev>
+    <memballoon model='virtio'>
+      <address type='pci' domain='0x0000' bus='0x08' slot='0x00' function='0x0'/>
+    </memballoon>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <address type='pci' domain='0x0000' bus='0x09' slot='0x00' function='0x0'/>
+    </rng>
+  </devices>
+</domain>
+EOF
+
+virsh define /var/lib/libvirt/images/san/rtr01.exabit.io/rtr01.exabit.io.xml;
+virsh define /var/lib/libvirt/images/san/rtr02.exabit.io/rtr02.exabit.io.xml;
+
+cat << 'EOF' > /var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
+<domain type='kvm'>
+  <name>lab01-cfg01.exabit.io</name>
+  <uuid>7d05172f-0961-4471-8599-a863fdc44727</uuid>
+  <memory unit='KiB'>16777216</memory>
+  <currentMemory unit='KiB'>16777216</currentMemory>
+  <vcpu placement='static'>8</vcpu>
+  <resource>
+    <partition>/machine</partition>
+  </resource>
+  <os>
+    <type arch='x86_64' machine='pc-i440fx-xenial'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/>
+  </features>
+  <cpu mode='host-model' check='partial'/>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
+  <devices>
+    <emulator>/usr/bin/kvm-spice</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' cache='writethrough' io='threads'/>
+      <source file='/var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/system.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='/var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/cfg01.exabit.io-config.iso'/>
+      <target dev='hda' bus='ide'/>
+      <readonly/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>
+    <controller type='usb' index='0' model='piix3-uhci'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x2'/>
+    </controller>
+    <controller type='pci' index='0' model='pci-root'/>
+    <controller type='ide' index='0'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
+    </controller>
+    <interface type='bridge'>
+      <mac address='52:54:00:19:1d:6e'/>
+      <source bridge='mgmt'/>
+      <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:f1:06:ff'/>
+      <source bridge='control'/>
+      <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
+    </interface>
+    <serial type='pty'>
+      <target type='isa-serial' port='0'>
+        <model name='isa-serial'/>
+      </target>
+    </serial>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+    <graphics type='vnc' port='-1' autoport='yes' listen='127.0.0.1'>
+      <listen type='address' address='127.0.0.1'/>
+    </graphics>
+    <video>
+      <model type='cirrus' vram='16384' heads='1' primary='yes'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+    </video>
+    <memballoon model='virtio'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
+    </memballoon>
+    <rng model='virtio'>
+      <backend model='random'>/dev/random</backend>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
+    </rng>
+  </devices>
+</domain>
+EOF
+
+virsh define /var/lib/libvirt/images/san/lab01/lab01-cfg01.exabit.io/lab01-cfg01.exabit.io.xml;
+
+# Node 1:
+virsh autostart rtr01.exabit.io;
+
+# Node 2:
+virsh autostart rtr02.exabit.io;
+
+# Node 3:
+virsh autostart lab01-cfg01.exabit.io;
+
+wget --directory-prefix=/var/lib/libvirt/images/san/ http://images-mirantis-com.s3.amazonaws.com/ubuntu-16-04-x64-mcp2019.2.0.qcow2;
+
+cat << 'EOF' > /var/lib/libvirt/images/san/create-virtual-machines.sh;
+#!/bin/bash
+pre_name_prefix="lab01-"
+post_name_prefix=.exabit.io
+disk_image="./ubuntu-16-04-x64-mcp2019.2.0.qcow2"
+deployment_network=mgmt
+primary_network=control
+deployment_subnet="10.10.1"
+deployment_gateway="10.10.1.1"
+deployment_netmask="255.255.255.0"
+deployment_nameserver="8.8.8.8 1.1.1.1"
+nic_interface_name=ens2
+salt_master_address="10.10.1.15"
+
+declare -Ax ip_addresses
+ip_addresses=(
+  [kvm01]="240"
+  [kvm02]="241"
+  [kvm03]="242"
+  [gtw01]="224"
+  [gtw02]="225"
+  [gtw03]="226"
+  [upg01]="19"
+)
+
+declare -ax machines
+machines=(
+  "kvm"
+  "gtw"
+  "upg"
+)
+
+declare -Ax kvm
+kvm=(
+  [node_count]=3
+  [disk_size]=3000
+  [ram]=163840
+  [cpus]=20
+)
+
+declare -Ax gtw
+gtw=(
+  [node_count]=3
+  [disk_size]=30
+  [ram]=2048
+  [cpus]=4
+)
+
+declare -Ax upg
+upg=(
+  [node_count]=1
+  [disk_size]=300
+  [ram]=16384
+  [cpus]=12
+)
+
+if ! [ $UID = "0" ]; then
+  echo "You must be root to run this command."
+  exit 1
+fi
+
+dataset_name=$(echo ${pre_name_prefix} | tr -d '-')
+test -d /var/lib/libvirt/images/${dataset_name} || {
+  mkdir /var/lib/libvirt/images/${dataset_name};
+}
+
+if ! lsmod | grep -q nbd; then
+  modprobe nbd max_part=8
+fi
+
+for i in "${machines[@]}"; do
+  count=$i[node_count]
+  for j in $(seq ${!count}); do
+    ram=$i[ram]
+    cpus=$i[cpus]
+    disk_size=$i[disk_size]
+    case $i in
+    cmp)
+      short_name=${i}00${j}
+      long_name=${pre_name_prefix}${short_name}${post_name_prefix}
+      ;;
+    osd)
+      short_name=${i}00${j}
+      long_name=${pre_name_prefix}${short_name}${post_name_prefix}
+      ;;
+    *)
+      short_name=${i}0${j}
+      long_name=${pre_name_prefix}${short_name}${post_name_prefix}
+      ;;
+    esac
+    mkdir /var/lib/libvirt/images/${dataset_name}/${long_name}
+    cp -p ${disk_image} /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2
+    chown libvirt-qemu:kvm /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2
+    qemu-img resize /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2 ${!disk_size}G
+    guestmount -a /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2 -m /dev/vg0/root /mnt
+    deployment_address=${deployment_subnet}.${ip_addresses[$short_name]}
+    cat <<EOF >/mnt/etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+auto ${nic_interface_name}
+iface ${nic_interface_name} inet static
+    address ${deployment_address}
+    netmask ${deployment_netmask}
+    gateway ${deployment_gateway}
+    dns-nameservers ${deployment_nameserver}
+EOF
+    echo "network: {config: disabled}" >/mnt/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    echo "master: ${salt_master_address}" >>/mnt/etc/salt/minion.d/minion.conf
+    echo "id: ${short_name}${post_name_prefix}" >>/mnt/etc/salt/minion.d/minion.conf
+    echo "root:password" | chpasswd -R /mnt
+    guestunmount /mnt
+    virt-install \
+      --name ${long_name} \
+      --memory ${!ram} \
+      --vcpus ${!cpus} \
+      --cpu host \
+      --controller usb,model=none \
+      --graphics none \
+      --sound none \
+      --network bridge=${deployment_network} \
+      --network bridge=${primary_network} \
+      --network bridge=${primary_network} \
+      --disk /var/lib/libvirt/images/${dataset_name}/${long_name}/system.qcow2 \
+      --noautoconsole \
+      --boot hd \
+      --os-variant ubuntu16.04 \
+      --autostart
+    case $i in
+    osd)
+      osd_count=$i[osd_count]
+      osd_size=$i[osd_size]
+      for k in $(seq ${!osd_count}); do
+        qemu-img create -f qcow2 /var/lib/libvirt/images/${dataset_name}/${long_name}/osd${k}.qcow2 ${!osd_size}G
+        chown libvirt-qemu:kvm /var/lib/libvirt/images/${dataset_name}/${long_name}/osd${k}.qcow2
+        virsh attach-disk \
+          ${long_name} \
+          --source /var/lib/libvirt/images/${dataset_name}/${long_name}/osd${k}.qcow2 \
+          --persistent \
+          --targetbus virtio \
+          --subdriver qcow2 \
+          --target vd$(echo ${k} | tr 123456789 bcdefghij)
+      done
+      ;;
+    *)
+      ;;
+    esac
+  done
+done
+
+for vm in $(virsh list --all --name | grep ${dataset_name} | grep -v cfg01); do
+  virsh dumpxml ${vm} > /var/lib/libvirt/images/${dataset_name}/${vm}/${vm}.xml;
+done
+EOF
+
+### Node 1
+for vm in lab01-{kvm,gtw}0{2,3}.exabit.io; do
+  virsh shutdown ${vm};
+  virsh undefine ${vm};
+done
+mv /var/lib/libvirt/images/lab01/lab01-{kvm,gtw}0{2,3}.exabit.io /var/lib/libvirt/images/san/lab01/;
+virsh autostart lab01-kvm01.exabit.io;
+virsh autostart lab01-gtw01.exabit.io;
+virsh console lab01-kvm01.exabit.io;
+### kvm01 console:
+salt-call saltutil.sync_all;
+salt-call state.apply linux.system.repo;
+salt-call state.apply salt.minion;
+
+### Node 2
+mv /var/lib/libvirt/images/san/lab01/lab01-{kvm,gtw}02.exabit.io /var/lib/libvirt/images/lab01/;
+for vm in $(ls /var/lib/libvirt/images/lab01); do
+  virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml;
+  virsh start ${vm};
+  virsh autostart ${vm};
+done
+virsh console lab01-kvm02.exabit.io
+### kvm02 console:
+salt-call saltutil.sync_all;
+salt-call state.apply linux.system.repo;
+salt-call state.apply salt.minion;
+
+### Node 3
+mv /var/lib/libvirt/images/san/lab01/lab01-{kvm,gtw}02.exabit.io /var/lib/libvirt/images/lab01/;
+mv /var/lib/libvirt/images/san/lab01/lab01-upg01.exabit.io /var/lib/libvirt/images/lab01/;
+for vm in $(ls /var/lib/libvirt/images/lab01); do
+  virsh define /var/lib/libvirt/images/lab01/${vm}/${vm}.xml;
+  virsh start ${vm};
+  virsh autostart ${vm};
+done
+virsh console lab01-kvm03.exabit.io;
+### kvm03 console:
+salt-call saltutil.sync_all;
+salt-call state.apply linux.system.repo;
+salt-call state.apply salt.minion;
+
+### Run from cfg01 node:
+salt 'kvm*' state.apply linux.system;
+salt 'kvm*' pkg.upgrade;
+salt 'kvm*' cmd.run 'apt -y upgrade';
+salt 'kvm*' cmd.run 'reboot' --async;
+salt 'kvm*' test.ping;
+
+
+
