@@ -36,7 +36,7 @@ apt install -y mdadm;
 mdadm --create /dev/md0 --level=10 --raid-devices=4 $(ls /dev/disk/by-id/ata-Samsung_SSD_850_PRO_256GB_*);
 
 # 20% for ZIL and 80% for L2ARC
-parted --script --align optimal /dev/md0 mklabel gpt mkpart primary 0% 25% name 1 slog mkpart primary 25% 100% name 2 l2arc;
+parted --script --align optimal /dev/md0 mklabel gpt mkpart primary 0% 20% name 1 slog mkpart primary 20% 100% name 2 l2arc;
 
 # Create rpool
 zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz1 $(ls /dev/disk/by-id/ata-ST5000LM000*) log /dev/md0p1 cache /dev/md0p2;
