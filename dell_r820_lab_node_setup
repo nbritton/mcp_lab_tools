@@ -32,6 +32,7 @@ mkfs.fat -n ESP -F32 /dev/sdk1;
 mkfs.ext4 -L boot /dev/sdk2;
 
 # Set up SSD caching
+apt install -y mdadm;
 mdadm --create /dev/md0 --level=10 --raid-devices=4 $(ls /dev/disk/by-id/ata-Samsung_SSD_850_PRO_256GB_*);
 
 # 20% for ZIL and 80% for L2ARC
