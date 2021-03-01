@@ -218,6 +218,8 @@ grub> linux /vmlinuz-5.4.0-66-generic root=ZFS=rpool/ROOT/ubuntu
 grub> initrd /boot/initrd.img-5.4.0-66-generic
 grub> boot
 
+apt update && apt -y upgrade;
+
 # Rerun update-grub and update-iniramfs
 update-grub;
 update-initramfs -u -k all;
