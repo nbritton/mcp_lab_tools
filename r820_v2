@@ -81,8 +81,8 @@ network:
 
   ethernets:
 
-    eno1: {mtu: 9000}
-    eno2: {mtu: 9000}
+    enp1s0f0: {mtu: 9000}
+    enp1s0f1: {mtu: 9000}
     enp2s0: {mtu: 9000}
     enp4s0: {mtu: 9000}
     enp66s0f0: {}
@@ -98,7 +98,7 @@ network:
 
     bond0:
       mtu: 9000
-      interfaces: [eno1, eno2]
+      interfaces: [enp1s0f0, enp1s0f1]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
@@ -177,8 +177,8 @@ network:
 
   ethernets:
 
-    eno1: {mtu: 9000}
-    eno2: {mtu: 9000}
+    enp1s0f0: {mtu: 9000}
+    enp1s0f1: {mtu: 9000}
     enp2s0: {mtu: 9000}
     enp4s0: {mtu: 9000}
     enp66s0f0: {}
@@ -194,7 +194,7 @@ network:
 
     bond0:
       mtu: 9000
-      interfaces: [eno1, eno2]
+      interfaces: [enp1s0f0, enp1s0f1]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
@@ -274,8 +274,9 @@ network:
 
   ethernets:
 
-    eno1: {mtu: 9000}
-    eno2: {mtu: 9000}
+enp1s0f0
+    enp1s0f0: {mtu: 9000}
+    enp1s0f1: {mtu: 9000}
     enp2s0: {mtu: 9000}
     enp4s0: {mtu: 9000}
     enp66s0f0: {}
@@ -291,7 +292,7 @@ network:
 
     bond0:
       mtu: 9000
-      interfaces: [eno1, eno2]
+      interfaces: [enp1s0f0, enp1s0f1]
       parameters:
         mode: 802.3ad
         lacp-rate: fast
@@ -365,31 +366,30 @@ netplan apply
 
 ### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
 # Installing this will reset the NIC, so if your primary NIC is a Mellanox then don't run this remotely.
-wget http://content.mellanox.com/ofed/MLNX_OFED-5.0-2.1.8.0/MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
-tar -axf MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64.tgz;
-cd MLNX_OFED_LINUX-5.0-2.1.8.0-ubuntu20.04-x86_64/;
-rmmod rdma_ucm ib_iser rpcrdma rdma_cm;
-./mlnxofedinstall;
-systemctl disable openibd; 
-
 wget https://content.mellanox.com/ofed/MLNX_OFED-5.2-2.2.0.0/MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64.tgz;
 tar -axf MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64.tgz;
 cd MLNX_OFED_LINUX-5.2-2.2.0.0-ubuntu20.04-x86_64/;
 rmmod rdma_ucm ib_iser rpcrdma rdma_cm;
 ./mlnxofedinstall --skip-unsupported-devices-check;
 
+## Configure Mellanox Cards:
 
-## Configure Mellanox Card:
 mst start;
-mlxconfig -d /dev/mst/mt4099_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
-mlxconfig -d /dev/mst/mt4099_pciconf1 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
-mlxconfig -d /dev/mst/mt4099_pciconf2 set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+
+# ConnectX-3 VPI PCIe Add-in Cards
+# Remove FlexBoot Option ROM as we don't need it.
+for device in $(ls /dev/mst/mt4099_pci_cr*); do
+  flint -d $device --allow_rom_change drom;
+done
+
+# Disable boot rom, set port type to ethernet, enable SR-IOV
+for device in $(ls /dev/mst/mt4099_pciconf*); do
+  mlxconfig -d $device set SRIOV_EN=1 NUM_OF_VFS=4 LINK_TYPE_P1=2 LINK_TYPE_P2=2 BOOT_OPTION_ROM_EN_P1=0 BOOT_OPTION_ROM_EN_P2=0;
+done
+
+# ConnextX-4 Lx Dell rNDC
 mlxconfig -d /dev/mst/mt4117_pciconf0 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
 mlxconfig -d /dev/mst/mt4117_pciconf0.1 set SRIOV_EN=1 NUM_OF_VFS=4 UEFI_HII_EN=0 LEGACY_BOOT_PROTOCOL=0;
-# Remove FlexBoot Option ROM as we don't need it.
-flint -d /dev/mst/mt4099_pci_cr0 --allow_rom_change drom;
-flint -d /dev/mst/mt4099_pci_cr1 --allow_rom_change drom;
-flint -d /dev/mst/mt4099_pci_cr2 --allow_rom_change drom;
 flint -d /dev/mst/mt4117_pciconf0 --allow_rom_change drom;
 
 # Create data
