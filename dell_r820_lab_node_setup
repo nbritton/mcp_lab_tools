@@ -27,12 +27,18 @@ wipefs -af /dev/sd{a..q};
 # Partition USB flash / SD Card, gpt1 is fat32 for EFI System Partition and gpt2 is Ext4 for /boot. Change /dev/sdq to your
 # device name. Also change 2048 if you're not using an 8GB device. EFI needs at least 512MB, and /boot needs at least 256MB...
 # but 1024MB or more is recommended. 
-parted --script --align optimal /dev/sdq mklabel gpt mkpart primary fat32 0% 2048 name 1 ESP set 1 esp on mkpart primary ext2 2048 100% name 2 boot;
-mkfs.fat -n ESP -F32 /dev/sdq1;
-mkfs.ext4 -L boot /dev/sdq2;
+parted --script --align optimal /dev/sdk mklabel gpt mkpart primary fat32 0% 2048 name 1 ESP set 1 esp on mkpart primary ext2 2048 100% name 2 boot;
+mkfs.fat -n ESP -F32 /dev/sdk1;
+mkfs.ext4 -L boot /dev/sdk2;
 
-# Create the zpool to your liking, i.g. raidz, raidz2, raidz3, etc.
-zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz2 /dev/sda /dev/sdi /dev/sdb /dev/sdj /dev/sdc /dev/sdk /dev/sdd /dev/sdl /dev/sde /dev/sdm /dev/sdf /dev/sdn /dev/sdg /dev/sdo /dev/sdh /dev/sdp
+# Set up SSD caching
+mdadm --create /dev/md0 --level=10 --raid-devices=4 $(ls /dev/disk/by-id/ata-Samsung_SSD_850_PRO_256GB_*);
+
+# 20% for ZIL and 80% for L2ARC
+parted --script --align optimal /dev/md0 mklabel gpt mkpart primary 0% 25% name 1 slog mkpart primary 25% 100% name 2 l2arc;
+
+# Create rpool
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=9 -O mountpoint=/ -R /mnt rpool raidz1 $(ls /dev/disk/by-id/ata-ST5000LM000*) log /dev/md0p1 cache /dev/md0p2;
 
 zfs create -o canmount=off -o mountpoint=none rpool/ROOT
 zfs create -o canmount=noauto -o mountpoint=/ rpool/ROOT/ubuntu
@@ -61,9 +67,9 @@ chmod 1777 /mnt/tmp
 
 # Mount EFI System Partition and /boot into the ZFS directory structure.
 mkdir /mnt/boot;
-mount /dev/sdq2 /mnt/boot;
+mount /dev/sdk2 /mnt/boot;
 mkdir /mnt/boot/efi;
-mount /dev/sdq1 /mnt/boot/efi;
+mount /dev/sdk1 /mnt/boot/efi;
 
 # Installation takes place using debootstrap.
 debootstrap focal /mnt;
