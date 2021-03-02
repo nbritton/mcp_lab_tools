@@ -407,7 +407,7 @@ zfs create -o mountpoint=/var/lib/libvirt/images data/images;
 
 ### Enable KVM virtualization:
 echo "options kvm-intel nested=y" >> /etc/modprobe.d/kvm.conf;
-apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager fio;
+apt -y install bridge-utils cpu-checker libguestfs-rescue libguestfs-tools linux-tools-common linux-tools-generic numactl numad qemu-kvm qemu-system-common qemu-system-x86 qemu-utils virtinst virt-manager;
 
 
 ### Install Dell OpenManage:
@@ -419,16 +419,11 @@ apt update && apt -y install srvadmin-all syscfg dcism-osc;
 apt -y install dcism;
 
 
-
-apt update && apt upgrade -y;
-
-reboot;
-
 ### Install GlusterFS ###
-apt install -y glusterfs-client glusterfs-common glusterfs-server keepalived;
+apt install -y glusterfs-client glusterfs-common glusterfs-server keepalived fio;
 systemctl enable glusterd;
 systemctl start glusterd;
-zfs create rpool/srv/glusterfs;
+zfs create -o mountpoint=/srv/glusterfs data/glusterfs;
 mkdir -p /srv/glusterfs/brick1/{images,san};
 gluster peer probe 10.10.100.8
 gluster peer probe 10.10.100.9
