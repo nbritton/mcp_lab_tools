@@ -14,7 +14,8 @@ ip a | grep "inet ";
 apt install -y autoconf automake autotools-dev bash-completion bash-doc bc bison build-essential chromium-browser \
 chrpath command-not-found cpufrequtils debhelper dkms dpatch flex gfortran graphviz htop httpie iftop iotop \
 iozone3 iperf3 iputils-tracepath jq libgfortran4 libgpgme11 libltdl-dev libnl-3-dev libnl-route-3-dev libssh2-1 \
-linux-headers-lowlatency linux-image-lowlatency linux-tools-lowlatency lldpad lm-sensors lsscsi m4 mtr nano \
+linux-lowlatency-hwe-20.04 linux-headers-lowlatency-hwe-20.04 linux-cloud-tools-lowlatency-hwe-20.04 \
+linux-tools-lowlatency-hwe-20.04 linux-image-lowlatency-hwe-20.04 lldpad lm-sensors lsscsi m4 mtr nano \
 net-tools netdiscover ngrep nmap pcregrep powertop quilt rdma-core smartmontools socat speedtest-cli stress-ng \
 swig sysstat tcl tk ubuntu-server vim xrdp zfsutils-linux;
 
@@ -263,7 +264,6 @@ network:
       id: 100
       link: bond2
 EOF
-netplan apply;
 
 ### Netplan configuration - Node 3 ###
 test -f /etc/netplan/01-network-manager-all.yaml && rm /etc/netplan/01-network-manager-all.yaml;
@@ -361,7 +361,6 @@ enp1s0f0
       id: 100
       link: bond2
 EOF
-netplan apply
 
 
 ### Install Mellanox OFED Packages for ConnectX-3/4/5 Networking Cards:
