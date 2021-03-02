@@ -274,7 +274,6 @@ network:
 
   ethernets:
 
-enp1s0f0
     enp1s0f0: {mtu: 9000}
     enp1s0f1: {mtu: 9000}
     enp2s0: {mtu: 9000}
