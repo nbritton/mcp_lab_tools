@@ -1,0 +1,193 @@
+# These commands will create an EFI USB flash drive with a live instance of Ubuntu Mate 20.04 LTS Server with ZFS on root.
+# Most any modern Linux system with debootstrap, chroot, and zfsutils should be able to run these commands to create it.
+
+# Device name of raw usb flash drive, in this example (cutomize to your needs) I'm using Samsung FIT Plus 128GB drives
+export usbflash=$(lsblk | awk '/119.5G/ {print $1}';)
+
+# Default partitioning scheme
+# mklabel gpt
+# mkpart primary fat32 0% 1024 name 1 ESP set 1 esp on
+# mkpart primary ext2 1024 4096 name 2 boot
+# mkpart primary zfs 4096 100% name 3 root
+
+parted --script --align optimal /dev/${usbflash} mklabel gpt mkpart primary fat32 0% 1024 name 1 ESP set 1 esp on mkpart primary ext2 1024 4096 name 2 boot mkpart primary zfs 4096 100% name 3 root;
+mkfs.fat -n ESP -F32 /dev/${usbflash}1;
+mkfs.ext4 -L boot /dev/${usbflash}2;
+
+zpool create -O recordsize=64k -O acltype=posixacl -O canmount=off -O compression=lz4 -O dnodesize=auto -O normalization=formD -O relatime=on -O xattr=sa -o ashift=12 -O mountpoint=/ -R /mnt root /dev/${usbflash}3;
+
+zfs create -o canmount=off -o mountpoint=none root/ROOT
+zfs create -o canmount=noauto -o mountpoint=/ root/ROOT/ubuntu
+zfs mount root/ROOT/ubuntu
+zfs create                                 root/home
+zfs create -o mountpoint=/root             root/home/root
+zfs create -o canmount=off                 root/var
+zfs create -o canmount=off                 root/var/lib
+zfs create                                 root/var/log
+zfs create                                 root/var/spool
+zfs create -o com.sun:auto-snapshot=false  root/var/cache
+zfs create -o com.sun:auto-snapshot=false  root/var/tmp
+chmod 1777 /mnt/var/tmp
+zfs create                                 root/opt
+zfs create                                 root/srv
+zfs create -o canmount=off                 root/usr
+zfs create                                 root/usr/local
+zfs create                                 root/var/mail
+zfs create                                 root/var/snap
+zfs create                                 root/var/www
+zfs create                                 root/var/lib/AccountsService
+zfs create -o com.sun:auto-snapshot=false  root/var/lib/docker
+zfs create -o com.sun:auto-snapshot=false  root/var/lib/nfs
+zfs create -o com.sun:auto-snapshot=false  root/tmp
+chmod 1777 /mnt/tmp
+
+mkdir /mnt/boot;
+mount /dev/${usbflash}2 /mnt/boot;
+mkdir /mnt/boot/efi;
+mount /dev/${usbflash}1 /mnt/boot/efi;
+
+debootstrap focal /mnt;
+zfs set devices=off root;
+
+# Generate uniqine machine id, and use it to also set hostname.
+uuidgen | tr -d '-' > /mnt/etc/machine-id;
+echo "um2004s-$(head -c 8 /mnt/etc/machine-id)" > /mnt/etc/hostname;
+echo "127.0.1.1       $(awk '{printf $1}' /mnt/etc/hostname).exabit.io $(awk '{printf $1}' /mnt/etc/hostname)" >> /mnt/etc/hosts;
+
+# Create default netplan configuration, the bonds are useful in case the network switches are still unconfigured and the bridges support virtual machines.
+cat << 'EOF' > /mnt/etc/netplan/01-netcfg.yaml;
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    eno1: {}
+    eno2: {}
+    eno3: {}
+    eno4: {}
+
+  bonds:
+    bond1:
+      interfaces: [eno1, eno2]
+      parameters:
+        mode: active-backup
+
+    bond2:
+      interfaces: [eno3, eno4]
+      parameters:
+        mode: active-backup
+
+  bridges:
+    bridge1:
+      interfaces: [bond1]
+      dhcp4: yes
+      dhcp6: yes
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+
+    bridge2:
+      interfaces: [bond2]
+      dhcp4: yes
+      dhcp6: yes
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1, 8.8.4.4, 1.0.0.1]
+EOF
+
+cat << 'EOF' > /mnt/etc/apt/sources.list;
+deb http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+
+deb http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+deb-src http://security.ubuntu.com/ubuntu focal-security main restricted universe multiverse
+
+deb http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+
+deb http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+deb-src http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+EOF
+
+# Bind special filesystems and chroot into the new debootstrap install.
+mount --rbind /dev  /mnt/dev;
+mount --rbind /proc /mnt/proc;
+mount --rbind /sys  /mnt/sys;
+chroot /mnt bash --login;
+rm /etc/mtab;
+ln -s /proc/self/mounts /etc/mtab;
+
+# Update apt package metadata and reconfigure locale and timezone.
+apt update;
+apt upgrade -y;
+dpkg-reconfigure locales; # aways also select en_US.UTF-8 in addition to any other dialects.
+dpkg-reconfigure tzdata;
+
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot ext4 errors=remount-ro 0 1" >> /etc/fstab;
+echo "UUID=$(ll /dev/disk/by-uuid | grep $(ll /dev/disk/by-label/ESP | awk -F/ '{print $NF}') | awk '{print $(NF-2)}') /boot/efi vfat umask=0077 0 1" >> /etc/fstab;
+
+apt install -y vim zfs-initramfs zfsutils-linux openssh-server ubuntu-server grub-efi;
+
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="root=ZFS=root\/ROOT\/ubuntu/' /etc/default/grub;
+
+grub-install /dev/$(ll /dev/disk/by-label/boot | awk -F/ '{print $NF}' | tr -d '0-9');
+
+apt install -y linux-image-generic linux-headers-generic linux-tools-generic;
+
+grub-mkconfig -o /boot/grub/grub.cfg;
+
+addgroup --system lpadmin;
+addgroup --system sambashare;
+
+zfs set mountpoint=legacy root/var/log;
+echo root/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy root/var/spool;
+echo root/var/spool /var/spool zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy root/var/tmp;
+echo root/var/tmp /var/tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+zfs set mountpoint=legacy root/tmp;
+echo root/tmp /tmp zfs nodev,relatime 0 0 >> /etc/fstab;
+
+sed -i 's/GRUB_TIMEOUT_STYLE=hidden/#GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub;
+sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=10/' /etc/default/grub;
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT=""/' /etc/default/grub;
+update-grub;
+
+update-initramfs -u -k all;
+
+echo "root:password" | chpasswd;
+
+ls /boot/grub/*/zfs.mod;
+
+# Add at least one user account.
+u=nbritton;
+zfs create rpool/home/$u;
+adduser $u;
+
+cp -a /etc/skel/. /home/$u;
+chown -R $u:$u /home/$u;
+usermod -a -G adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo $u;
+
+install -d -o $u -g $u -m 700 /home/$u/.ssh;
+curl -s https://github.com/$u.keys > /home/$u/.ssh/id_ed25519.pub;
+chown $u:$u /home/$u/.ssh/id_ed25519.pub;
+install -o $u -g $u -m 600 /home/$u/.ssh/id_ed25519.pub /home/$u/.ssh/authorized_keys;
+
+systemctl enable ssh;
+
+### Enable password-less sudo for users in the sudo group:
+sed -i 's/^%sudo.*ALL$/%sudo\tALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers;
+
+zfs snapshot root/ROOT/ubuntu@install;
+
+mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {};
+
+zpool export root;
+
+eject /dev/sdab
+
+
+
+apt install -y gir1.2-matedesktop-2.0:amd64 gir1.2-matemenu-2.0:amd64 gir1.2-matepanelapplet-4.0:amd64 libann0 libcolamd2:amd64 libmate-desktop-2-17:amd64 libmatedict6 libmatekbd4:amd64 libmatekbd-common libmate-menu2:amd64 libmatemixer0:amd64 libmatemixer-common libmate-panel-applet-4-1:amd64 libmate-sensors-applet-plugin0 libmate-slab0:amd64 libmateweather1:amd64 libmateweather-common libmate-window-settings1:amd64 mate-accessibility-profiles mate-applet-appmenu mate-applet-brisk-menu mate-applets mate-applets-common mate-calc mate-calc-common mate-control-center mate-control-center-common mate-desktop mate-desktop-common mate-desktop-environment-core mate-dock-applet mate-hud mate-icon-theme mate-indicator-applet mate-indicator-applet-common mate-media mate-media-common mate-menu mate-menus mate-netbook mate-netbook-common mate-notification-daemon mate-notification-daemon-common mate-optimus mate-panel mate-panel-common mate-polkit:amd64 mate-polkit-common mate-power-manager mate-power-manager-common mate-screensaver mate-screensaver-common mate-sensors-applet mate-sensors-applet-common mate-session-manager mate-settings-daemon mate-settings-daemon-common mate-system-monitor mate-system-monitor-common mate-terminal mate-terminal-common mate-themes mate-tweak mate-user-guide mate-utils mate-utils-common mate-window-applets-common mate-window-buttons-applet mate-window-menu-applet mate-window-title-applet plymouth-theme-ubuntu-mate-logo plymouth-theme-ubuntu-mate-text ubuntu-mate-artwork ubuntu-mate-core ubuntu-mate-default-settings ubuntu-mate-desktop ubuntu-mate-guide ubuntu-mate-icon-themes ubuntu-mate-themes ubuntu-mate-wallpapers ubuntu-mate-wallpapers-common ubuntu-mate-wallpapers-focal ubuntu-mate-wallpapers-photos;
+
